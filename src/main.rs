@@ -41,6 +41,24 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Tile {
+    Empty,
+}
+
+#[derive(Debug)]
+struct Board {
+    grid: [[Tile; 16]; 16],
+}
+
+impl Board {
+    fn new() -> Self {
+        Self {
+            grid: [[Tile::Empty; 16]; 16],
+        }
+    }
+}
+
 /// Entry point for the game.
 #[no_mangle]
 extern "C" fn main() -> ! {
@@ -55,6 +73,10 @@ extern "C" fn main() -> ! {
     IE.write(IrqBits::VBLANK);
     // Enable interrupts generally.
     IME.write(true);
+
+    let board = Board::new();
+
+    log::info!("board: {:?}", board);
 
     loop {}
 }
