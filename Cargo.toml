@@ -3,4 +3,15 @@ name = "rusty_jam_3"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+panic = "abort"
+opt-level = 3
+
+[profile.release]
+panic = "abort"
+lto = true
+
 [dependencies]
+gba = "0.11.1"
+log = {version = "0.4.17", features = ["max_level_debug", "release_max_level_off"]}
+mgba_log = {path = "mgba_log"}
