@@ -1,6 +1,8 @@
 #![no_std]
 #![no_main]
 
+extern crate gba;
+
 #[cfg(debug_assertions)]
 use ::{
     core::fmt::Write,
@@ -10,7 +12,6 @@ use ::{
         MgbaWriter,
     }
 };
-use gba::interrupts::IrqBits;
 
 /// This panic handler is specifically for debug mode.
 /// 
@@ -37,9 +38,6 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
-#[link_section = ".iwram"]
-extern "C" fn irq_handler(_: IrqBits) {}
-
 /// Entry point for the game.
 #[no_mangle]
 extern "C" fn main() -> ! {
@@ -48,6 +46,8 @@ extern "C" fn main() -> ! {
     // This logging only works in mGBA. It is only enabled in debug builds.
     #[cfg(debug_assertions)]
     mgba_log::init().expect("failed to initialize mgba logging");
+
+    
 
     log::info!("Hello, world!");
 
