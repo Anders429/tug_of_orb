@@ -1,8 +1,6 @@
 #![no_std]
 #![no_main]
 
-extern crate gba;
-
 #[cfg(debug_assertions)]
 use ::{
     core::fmt::Write,
@@ -12,6 +10,11 @@ use ::{
         MgbaWriter,
     }
 };
+use gba::{interrupts::IrqBits, mmio::{
+    DISPSTAT,
+    IE,
+    IME,
+}, video::DisplayStatus};
 
 /// This panic handler is specifically for debug mode.
 /// 
@@ -47,9 +50,11 @@ extern "C" fn main() -> ! {
     #[cfg(debug_assertions)]
     mgba_log::init().expect("failed to initialize mgba logging");
 
-    
-
-    log::info!("Hello, world!");
+    // Enable vblank interrupts.
+    DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
+    IE.write(IrqBits::VBLANK);
+    // Enable interrupts generally.
+    IME.write(true);
 
     loop {}
 }
