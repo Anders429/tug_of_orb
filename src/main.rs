@@ -1,26 +1,24 @@
 #![no_std]
 #![no_main]
 
+mod game;
+
+use game::Game;
+use gba::{
+    bios::VBlankIntrWait,
+    interrupts::IrqBits,
+    mmio::{BG0CNT, DISPCNT, DISPSTAT, IE, IME, KEYINPUT},
+    video::{BackgroundControl, DisplayControl, DisplayStatus, VideoMode},
+};
 #[cfg(debug_assertions)]
 use ::{
     core::fmt::Write,
     log::error,
-    mgba_log::{
-        MgbaLogLevel,
-        MgbaWriter,
-    }
+    mgba_log::{MgbaLogLevel, MgbaWriter},
 };
-use gba::{bios::VBlankIntrWait, interrupts::IrqBits, mmio::{
-    BG0CNT,
-    DISPCNT,
-    DISPSTAT,
-    IE,
-    IME,
-    KEYINPUT,
-}, video::{BackgroundControl, DisplayControl, DisplayStatus, VideoMode}};
 
 /// This panic handler is specifically for debug mode.
-/// 
+///
 /// When panicking in debug builds, the panic info is logged as an error. Following this, a fatal
 /// log will occur to halt emulation and display an error to the user. This is done to ensure the
 /// entirety of the panic info is displayed to the user, as mGBA only allows for up to 256 bytes to
@@ -35,46 +33,13 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 }
 
 /// This panic handler is specifically for release mode.
-/// 
+///
 /// In release builds, panicking just causes the game to lock up. Ideally, panicking should not
 /// occur at all in release builds.
 #[cfg(not(debug_assertions))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
-}
-
-#[derive(Clone, Copy, Debug)]
-enum Alignment {
-    None,
-    Red,
-    Blue,
-    Yellow,
-    Green,
-}
-
-impl Default for Alignment {
-    fn default() -> Self {
-        Self::None
-    }
-}
-
-#[derive(Debug, Default)]
-struct Square {
-    alignment: Alignment,
-}
-
-#[derive(Debug)]
-struct Board {
-    grid: [[Square; 16]; 16],
-}
-
-impl Board {
-    fn new() -> Self {
-        Self {
-            grid: Default::default(),
-        }
-    }
 }
 
 /// Entry point for the game.
@@ -95,20 +60,25 @@ extern "C" fn main() -> ! {
     // Configure BG0 tilemap.
     BG0CNT.write(BackgroundControl::new().with_screenblock(31));
     // Set BG0 to be displayed.
-    DISPCNT.write(DisplayControl::new().with_video_mode(VideoMode::_2).with_show_bg0(true));
+    DISPCNT.write(
+        DisplayControl::new()
+            .with_video_mode(VideoMode::_2)
+            .with_show_bg0(true),
+    );
 
-    let board = Board::new();
+    let game = Game::builder().build();
+    log::info!("{:?}", game);
 
     loop {
         // Read keys for each frame.
         let keys = KEYINPUT.read();
-        
+
         VBlankIntrWait();
 
         // Draw the grid.
         // for row in &board.grid {
         //     for square in row {
-                
+
         //     }
         // }
     }
