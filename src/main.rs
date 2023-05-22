@@ -10,11 +10,14 @@ use ::{
         MgbaWriter,
     }
 };
-use gba::{interrupts::IrqBits, mmio::{
+use gba::{bios::VBlankIntrWait, interrupts::IrqBits, mmio::{
+    BG0CNT,
+    DISPCNT,
     DISPSTAT,
     IE,
     IME,
-}, video::DisplayStatus};
+    KEYINPUT,
+}, video::{BackgroundControl, DisplayControl, DisplayStatus, VideoMode}};
 
 /// This panic handler is specifically for debug mode.
 /// 
@@ -42,19 +45,34 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Tile {
-    Empty,
+enum Alignment {
+    None,
+    Red,
+    Blue,
+    Yellow,
+    Green,
+}
+
+impl Default for Alignment {
+    fn default() -> Self {
+        Self::None
+    }
+}
+
+#[derive(Debug, Default)]
+struct Square {
+    alignment: Alignment,
 }
 
 #[derive(Debug)]
 struct Board {
-    grid: [[Tile; 16]; 16],
+    grid: [[Square; 16]; 16],
 }
 
 impl Board {
     fn new() -> Self {
         Self {
-            grid: [[Tile::Empty; 16]; 16],
+            grid: Default::default(),
         }
     }
 }
@@ -74,9 +92,24 @@ extern "C" fn main() -> ! {
     // Enable interrupts generally.
     IME.write(true);
 
+    // Configure BG0 tilemap.
+    BG0CNT.write(BackgroundControl::new().with_screenblock(31));
+    // Set BG0 to be displayed.
+    DISPCNT.write(DisplayControl::new().with_video_mode(VideoMode::_2).with_show_bg0(true));
+
     let board = Board::new();
 
-    log::info!("board: {:?}", board);
+    loop {
+        // Read keys for each frame.
+        let keys = KEYINPUT.read();
+        
+        VBlankIntrWait();
 
-    loop {}
+        // Draw the grid.
+        // for row in &board.grid {
+        //     for square in row {
+                
+        //     }
+        // }
+    }
 }
