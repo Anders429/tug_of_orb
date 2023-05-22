@@ -18,6 +18,11 @@ pub enum Color {
     Green,
 }
 
+pub enum Conclusion {
+    Undecided,
+    Winner(Color),
+}
+
 /// The game state.
 #[derive(Debug)]
 pub struct Game {
@@ -39,16 +44,28 @@ impl Game {
         }
     }
 
-    pub fn take_turn(&mut self, turn: Turn) -> Result<(), turn::Error> {
+    fn increment_turn(&mut self) {
+        self.turn_color = match self.turn_color {
+            Color::Red => Color::Blue,
+            Color::Blue => Color::Yellow,
+            Color::Yellow => Color::Green,
+            Color::Green => Color::Red,
+        };
+    }
+
+    pub fn take_turn(&mut self, turn: Turn) -> Result<Conclusion, turn::Error> {
         let square = self
             .grid
-            .get(turn.rotate)
+            .get_mut(turn.rotate)
             .ok_or(turn::Error::InvalidRotationPosition)?;
-        if !square.is_rotatable(self.turn_color) {
+        if !square.is_color(self.turn_color) {
             return Err(turn::Error::InvalidRotationPosition);
         }
 
-        todo!()
+        square.rotate();
+
+        self.increment_turn();
+        Ok(Conclusion::Undecided)
     }
 }
 

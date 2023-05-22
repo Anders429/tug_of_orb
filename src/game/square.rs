@@ -8,6 +8,17 @@ pub enum Direction {
     Down,
 }
 
+impl Direction {
+    fn rotate(&mut self) {
+        match self {
+            Self::Left => Self::Up,
+            Self::Up => Self::Right,
+            Self::Right => Self::Down,
+            Self::Down => Self::Left,
+        };
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Square {
     Empty,
@@ -19,10 +30,17 @@ pub enum Square {
 }
 
 impl Square {
-    pub fn is_rotatable(&self, color: Color) -> bool {
+    pub fn is_color(&self, color: Color) -> bool {
         match self {
-            Self::Empty | Self::Wall => false,
             Self::Arrow { alignment, .. } => matches!(alignment, Some(color)),
+            _ => false,
+        }
+    }
+
+    pub fn rotate(&mut self) {
+        match self {
+            Self::Arrow { direction, .. } => direction.rotate(),
+            _ => {}
         }
     }
 }
