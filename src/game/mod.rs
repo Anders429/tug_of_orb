@@ -6,6 +6,7 @@ mod node;
 mod position;
 mod turn;
 
+use core::num::NonZeroU16;
 use direction::Direction;
 use grid::Grid;
 use node::Node;
@@ -21,6 +22,27 @@ pub enum Color {
     Green,
 }
 
+#[derive(Debug)]
+pub struct ColorCounts {
+    red: Option<NonZeroU16>,
+    blue: Option<NonZeroU16>,
+    yellow: Option<NonZeroU16>,
+    green: Option<NonZeroU16>,
+}
+
+impl ColorCounts {
+    fn change_color_counts(&mut self, increment: Color, decrement: Option<Color>) {
+        match increment {
+            Color::Red => match self.red.as_mut() {
+                Some(count) => *count = count.checked_add(1).expect("red count overflowed"),
+                None => self.red = Some(unsafe { NonZeroU16::new_unchecked(1) }),
+            },
+
+            _ => {}
+        }
+    }
+}
+
 pub enum Conclusion {
     Undecided,
     Winner(Color),
@@ -31,6 +53,9 @@ pub enum Conclusion {
 pub struct Game {
     /// Indicates whose turn it is.
     turn_color: Color,
+
+    // These counts must invariantly match with the number of colors in `self.grid`.
+    color_counts: ColorCounts,
 
     grid: Grid,
 }
@@ -44,6 +69,17 @@ impl Game {
         }
     }
 
+    fn change_color_counts(&mut self, increment: Color, decrement: Option<Color>) {
+        match increment {
+            Color::Red => match self.color_counts.red.as_mut() {
+                Some(count) => *count = count.checked_add(1).expect("red count overflowed"),
+                None => self.color_counts.red = Some(unsafe { NonZeroU16::new_unchecked(1) }),
+            },
+
+            _ => {}
+        }
+    }
+
     /// Fill in the current color beginning at the given position.
     fn fill(&mut self, position: Position) {
         // Ensure this is a valid position.
@@ -51,6 +87,7 @@ impl Game {
             Some(node) => node,
             None => return,
         };
+        let old_color = node.color();
         if !node.set_color(self.turn_color) {
             // Stop if the color was not changed; that means we have already been this direction
             // before.
@@ -82,14 +119,56 @@ impl Game {
     }
 
     /// Make it the next player's turn.
-    fn increment_turn(&mut self) {
-        // TODO: Account for colors that no longer exist on the grid.
+    ///
+    /// Returns false if the turn color was not changed.
+    fn increment_turn(&mut self) -> bool {
         self.turn_color = match self.turn_color {
-            Color::Red => Color::Blue,
-            Color::Blue => Color::Yellow,
-            Color::Yellow => Color::Green,
-            Color::Green => Color::Red,
+            Color::Red => {
+                if self.color_counts.blue.is_some() {
+                    Color::Blue
+                } else if self.color_counts.yellow.is_some() {
+                    Color::Yellow
+                } else if self.color_counts.green.is_some() {
+                    Color::Green
+                } else {
+                    return false;
+                }
+            }
+            Color::Blue => {
+                if self.color_counts.yellow.is_some() {
+                    Color::Yellow
+                } else if self.color_counts.green.is_some() {
+                    Color::Green
+                } else if self.color_counts.red.is_some() {
+                    Color::Red
+                } else {
+                    return false;
+                }
+            }
+            Color::Yellow => {
+                if self.color_counts.green.is_some() {
+                    Color::Green
+                } else if self.color_counts.red.is_some() {
+                    Color::Red
+                } else if self.color_counts.blue.is_some() {
+                    Color::Blue
+                } else {
+                    return false;
+                }
+            }
+            Color::Green => {
+                if self.color_counts.red.is_some() {
+                    Color::Red
+                } else if self.color_counts.blue.is_some() {
+                    Color::Blue
+                } else if self.color_counts.yellow.is_some() {
+                    Color::Yellow
+                } else {
+                    return false;
+                }
+            }
         };
+        true
     }
 
     /// Execute turn for the current player.
@@ -132,8 +211,12 @@ impl Builder {
     }
 
     pub fn build(self) -> Game {
+        let color_counts = self.grid.color_counts();
+
         Game {
             turn_color: self.turn_color,
+
+            color_counts,
 
             grid: self.grid,
         }

@@ -11,6 +11,13 @@ pub enum Node {
 }
 
 impl Node {
+    pub fn color(&self) -> Option<Color> {
+        match self {
+            Self::Arrow { alignment, .. } => *alignment,
+            _ => None,
+        }
+    }
+
     pub fn is_color(&self, color: Color) -> bool {
         match self {
             Self::Arrow { alignment, .. } => matches!(alignment, Some(color)),

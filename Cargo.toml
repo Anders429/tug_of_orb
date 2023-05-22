@@ -5,7 +5,8 @@ edition = "2021"
 
 [profile.dev]
 panic = "abort"
-opt-level = 3
+# Causes miscompilation when counting colors in grid. Idk what that's about.
+# opt-level = 3
 
 [profile.release]
 panic = "abort"
