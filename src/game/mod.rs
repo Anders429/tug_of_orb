@@ -31,14 +31,41 @@ pub struct ColorCounts {
 }
 
 impl ColorCounts {
-    fn change_color_counts(&mut self, increment: Color, decrement: Option<Color>) {
+    fn change(&mut self, increment: Color, decrement: Option<Color>) {
         match increment {
             Color::Red => match self.red.as_mut() {
                 Some(count) => *count = count.checked_add(1).expect("red count overflowed"),
                 None => self.red = Some(unsafe { NonZeroU16::new_unchecked(1) }),
             },
+            Color::Blue => match self.blue.as_mut() {
+                Some(count) => *count = count.checked_add(1).expect("blue count overflowed"),
+                None => self.blue = Some(unsafe { NonZeroU16::new_unchecked(1) }),
+            },
+            Color::Yellow => match self.yellow.as_mut() {
+                Some(count) => *count = count.checked_add(1).expect("yellow count overflowed"),
+                None => self.yellow = Some(unsafe { NonZeroU16::new_unchecked(1) }),
+            },
+            Color::Green => match self.green.as_mut() {
+                Some(count) => *count = count.checked_add(1).expect("green count overflowed"),
+                None => self.green = Some(unsafe { NonZeroU16::new_unchecked(1) }),
+            },
+        }
 
-            _ => {}
+        match decrement {
+            Some(Color::Red) => {
+                self.red = NonZeroU16::new(self.red.expect("red count underflowed").get() - 1)
+            }
+            Some(Color::Blue) => {
+                self.blue = NonZeroU16::new(self.blue.expect("blue count underflowed").get() - 1)
+            }
+            Some(Color::Yellow) => {
+                self.yellow =
+                    NonZeroU16::new(self.yellow.expect("yellow count underflowed").get() - 1)
+            }
+            Some(Color::Green) => {
+                self.green = NonZeroU16::new(self.green.expect("green count underflowed").get() - 1)
+            }
+            None => {}
         }
     }
 }
@@ -93,6 +120,7 @@ impl Game {
             // before.
             return;
         }
+        self.color_counts.change(self.turn_color, old_color);
 
         // Deal with the node this node points to.
         if let Some(direction) = node.direction() {
