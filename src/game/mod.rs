@@ -26,9 +26,7 @@ pub enum Conclusion {
 /// The game state.
 #[derive(Debug)]
 pub struct Game {
-    /// The player's color.
-    player_color: Color,
-    /// The color of the current turn player.
+    /// Indicates whose turn it is.
     turn_color: Color,
 
     grid: Grid,
@@ -37,7 +35,6 @@ pub struct Game {
 impl Game {
     pub fn builder() -> Builder {
         Builder {
-            player_color: Color::Red,
             turn_color: Color::Red,
 
             grid: Grid::new([[Square::Empty; 16]; 16]),
@@ -74,18 +71,12 @@ impl Game {
 /// Default values are set when this is constructed. They can be changed if desired.
 #[derive(Debug)]
 pub struct Builder {
-    player_color: Color,
     turn_color: Color,
 
     grid: Grid,
 }
 
 impl Builder {
-    pub fn player_color(mut self, player_color: Color) -> Self {
-        self.player_color = player_color;
-        self
-    }
-
     pub fn turn_color(mut self, turn_color: Color) -> Self {
         self.turn_color = turn_color;
         self
@@ -98,7 +89,6 @@ impl Builder {
 
     pub fn build(self) -> Game {
         Game {
-            player_color: self.player_color,
             turn_color: self.turn_color,
 
             grid: self.grid,
