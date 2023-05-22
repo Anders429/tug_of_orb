@@ -3,7 +3,7 @@
 
 mod game;
 
-use game::Game;
+use game::{Direction, Game, Position};
 use gba::{
     bios::VBlankIntrWait,
     interrupts::IrqBits,
@@ -42,6 +42,13 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
+#[derive(Debug)]
+struct State {
+    cursor: game::Position,
+
+    game: Game,
+}
+
 /// Entry point for the game.
 #[no_mangle]
 extern "C" fn main() -> ! {
@@ -66,12 +73,33 @@ extern "C" fn main() -> ! {
             .with_show_bg0(true),
     );
 
-    let game = Game::builder().build();
-    log::info!("{:?}", game);
+    let mut state = State {
+        game: Game::builder().build(),
+
+        cursor: Position { x: 0, y: 0 },
+    };
+    log::info!("{:?}", state);
 
     loop {
         // Read keys for each frame.
         let keys = KEYINPUT.read();
+
+        if keys.start() {
+            log::info!("cursor: {:?}", state.cursor);
+        }
+        const MAX_POSITION: Position = Position { x: 15, y: 15 };
+        if keys.right() {
+            state.cursor = state.cursor.move_saturating(Direction::Right, MAX_POSITION);
+        }
+        if keys.up() {
+            state.cursor = state.cursor.move_saturating(Direction::Up, MAX_POSITION);
+        }
+        if keys.left() {
+            state.cursor = state.cursor.move_saturating(Direction::Left, MAX_POSITION);
+        }
+        if keys.down() {
+            state.cursor = state.cursor.move_saturating(Direction::Down, MAX_POSITION);
+        }
 
         VBlankIntrWait();
 

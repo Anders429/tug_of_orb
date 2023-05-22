@@ -6,11 +6,12 @@ mod node;
 mod position;
 mod turn;
 
+pub use direction::Direction;
+pub use position::Position;
+
 use core::num::NonZeroU16;
-use direction::Direction;
 use grid::Grid;
 use node::Node;
-use position::Position;
 use turn::Turn;
 
 #[derive(Clone, Copy, Debug)]
