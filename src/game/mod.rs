@@ -40,9 +40,13 @@ impl Game {
     }
 
     pub fn take_turn(&mut self, turn: Turn) -> Result<(), turn::Error> {
-        self.grid
+        let square = self
+            .grid
             .get(turn.rotate)
             .ok_or(turn::Error::InvalidRotationPosition)?;
+        if !square.is_rotatable(self.turn_color) {
+            return Err(turn::Error::InvalidRotationPosition);
+        }
 
         todo!()
     }
