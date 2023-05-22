@@ -1,38 +1,32 @@
 //! The actual gameplay.
 
+mod grid;
+mod position;
+mod square;
+mod turn;
+
+use grid::Grid;
+use square::Square;
+use turn::Turn;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Color {
+    // Player colors.
     Red,
     Blue,
     Yellow,
     Green,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub enum Direction {
-    Left,
-    Up,
-    Right,
-    Down,
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum Square {
-    Empty,
-    Wall,
-    Arrow {
-        alignment: Option<Color>,
-        direction: Direction,
-    },
-}
-
 /// The game state.
 #[derive(Debug)]
 pub struct Game {
+    /// The player's color.
     player_color: Color,
+    /// The color of the current turn player.
     turn_color: Color,
 
-    grid: [[Square; 16]; 16],
+    grid: Grid,
 }
 
 impl Game {
@@ -41,8 +35,16 @@ impl Game {
             player_color: Color::Red,
             turn_color: Color::Red,
 
-            grid: [[Square::Empty; 16]; 16],
+            grid: Grid::new([[Square::Empty; 16]; 16]),
         }
+    }
+
+    pub fn take_turn(&mut self, turn: Turn) -> Result<(), turn::Error> {
+        self.grid
+            .get(turn.rotate)
+            .ok_or(turn::Error::InvalidRotationPosition)?;
+
+        todo!()
     }
 }
 
@@ -54,7 +56,7 @@ pub struct Builder {
     player_color: Color,
     turn_color: Color,
 
-    grid: [[Square; 16]; 16],
+    grid: Grid,
 }
 
 impl Builder {
@@ -68,7 +70,7 @@ impl Builder {
         self
     }
 
-    pub fn grid(mut self, grid: [[Square; 16]; 16]) -> Self {
+    pub fn grid(mut self, grid: Grid) -> Self {
         self.grid = grid;
         self
     }
