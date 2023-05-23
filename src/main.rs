@@ -137,15 +137,6 @@ extern "C" fn main() -> ! {
         0b0010_0010_0010_0010_0010_0010_0000_0000,
     ]);
 
-    // Define the object.
-    let mut obj = ObjAttr::new();
-    obj.set_x(44);
-    obj.set_y(38);
-    obj.set_tile_id(0);
-    obj.set_palbank(0);
-    obj.1 = obj.1.with_size(1);
-    OBJ_ATTR_ALL.get(0).unwrap().write(obj);
-
     // Hide other objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
         address.write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed))
@@ -175,5 +166,12 @@ extern "C" fn main() -> ! {
         VBlankIntrWait();
 
         // Draw the cursor.
+        let mut obj = ObjAttr::new();
+        obj.set_x(state.cursor.x as u16 * 16);
+        obj.set_y(state.cursor.y as u16 * 16);
+        obj.set_tile_id(0);
+        obj.set_palbank(0);
+        obj.1 = obj.1.with_size(1);
+        OBJ_ATTR_ALL.get(0).unwrap().write(obj);
     }
 }
