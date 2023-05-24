@@ -138,6 +138,18 @@ extern "C" fn main() -> ! {
                     direction: Direction::Up,
                     alignment: Some(game::Color::Red),
                 };
+                grid[0][1] = Node::Arrow {
+                    direction: Direction::Up,
+                    alignment: Some(game::Color::Blue),
+                };
+                grid[0][2] = Node::Arrow {
+                    direction: Direction::Up,
+                    alignment: Some(game::Color::Yellow),
+                };
+                grid[0][3] = Node::Arrow {
+                    direction: Direction::Up,
+                    alignment: Some(game::Color::Green),
+                };
                 grid
             }))
             .build(),
@@ -160,6 +172,30 @@ extern "C" fn main() -> ! {
         .enumerate()
     {
         bg_palbank(1).index(index).write(Color(*bytes));
+    }
+    // Define the blue palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/blue.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        bg_palbank(2).index(index).write(Color(*bytes));
+    }
+    // Define the yellow palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/yellow.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        bg_palbank(3).index(index).write(Color(*bytes));
+    }
+    // Define the green palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/green.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        bg_palbank(4).index(index).write(Color(*bytes));
     }
 
     // Define cursor palette.
@@ -204,6 +240,9 @@ extern "C" fn main() -> ! {
                 } => {
                     let palette = match alignment {
                         Some(game::Color::Red) => 1,
+                        Some(game::Color::Blue) => 2,
+                        Some(game::Color::Yellow) => 3,
+                        Some(game::Color::Green) => 4,
                         _ => 0,
                     };
                     match direction {
