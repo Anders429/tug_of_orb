@@ -130,6 +130,8 @@ extern "C" fn main() -> ! {
     load_tiles!("../res/wall.4bpp", 1);
     load_tiles!("../res/arrow_right.4bpp", 5);
     load_tiles!("../res/arrow_left.4bpp", 9);
+    load_tiles!("../res/arrow_down.4bpp", 13);
+    load_tiles!("../res/arrow_up.4bpp", 17);
 
     // Define the cursor tiles.
     let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
@@ -281,6 +283,74 @@ extern "C" fn main() -> ! {
                             .get(x * 2 + 1)
                             .unwrap()
                             .write(TextEntry::new().with_tile(8));
+                    }
+                    Direction::Down => {
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(13));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(14));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(15));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(16));
+                    }
+                    Direction::Up => {
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(17));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(18));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(19));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(20));
                     }
                     _ => {}
                 },
