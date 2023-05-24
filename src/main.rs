@@ -84,6 +84,9 @@ fn set_block(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
         .write(TextEntry::new().with_tile(tile).with_palbank(palette));
 }
 
+/// Set the tiles for an (x, y) position to a single tile.
+///
+/// This tile will be used four times, as an (x, y) position occupies four tile spaces.
 fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
     set_block(x * 2, y * 2, tile, frame, palette);
     set_block(x * 2 + 2, y * 2, tile, frame, palette);
@@ -91,7 +94,7 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
     set_block(x * 2 + 1, y * 2 + 1, tile, frame, palette);
 }
 
-// Set the tiles for an (x, y) position to group of four sequential tiles.
+/// Set the tiles for an (x, y) position to group of four sequential tiles.
 fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize, palette: u16) {
     set_block(x * 2, y * 2, tile_start, frame, palette);
     set_block(x * 2 + 1, y * 2, tile_start + 1, frame, palette);
