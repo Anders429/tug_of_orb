@@ -3,6 +3,7 @@
 
 mod game;
 
+use core::slice;
 use game::{Direction, Game, Position};
 use gba::{
     bios::VBlankIntrWait,
@@ -15,6 +16,7 @@ use gba::{
         obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
         BackgroundControl, Color, DisplayControl, DisplayStatus, VideoMode,
     },
+    Align4,
 };
 #[cfg(debug_assertions)]
 use ::{
@@ -87,55 +89,24 @@ extern "C" fn main() -> ! {
     };
     log::info!("{:?}", state);
 
-    // Define a palette.
-    let colors = [Color::from_rgb(31, 16, 1), Color::from_rgb(3, 3, 3)];
-    for (index, color) in colors.iter().enumerate() {
-        obj_palbank(0).index(index + 1).write(*color);
+    // Define cursor palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/cursor.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        obj_palbank(0).index(index).write(Color(*bytes));
     }
 
     // Define the tiles.
-    //
-    // There has got to be some better way. Need to figure out how to convert resources to 4bpp.
-    OBJ_TILES.as_region().get(0).unwrap().write([
-        0b0000_0000_0010_0010_0010_0010_0010_0010,
-        0b0000_0000_0010_0001_0001_0001_0001_0010,
-        0b0000_0000_0010_0010_0010_0001_0001_0010,
-        0b0000_0000_0000_0000_0010_0010_0001_0010,
-        0b0000_0000_0000_0000_0000_0010_0001_0010,
-        0b0000_0000_0000_0000_0000_0010_0010_0010,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-    ]);
-    OBJ_TILES.as_region().get(1).unwrap().write([
-        0b0010_0010_0010_0010_0010_0010_0000_0000,
-        0b0010_0001_0001_0001_0001_0010_0000_0000,
-        0b0010_0001_0001_0010_0010_0010_0000_0000,
-        0b0010_0001_0010_0010_0000_0000_0000_0000,
-        0b0010_0001_0010_0000_0000_0000_0000_0000,
-        0b0010_0010_0010_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-    ]);
-    OBJ_TILES.as_region().get(2).unwrap().write([
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0010_0010_0010,
-        0b0000_0000_0000_0000_0000_0010_0001_0010,
-        0b0000_0000_0000_0000_0010_0010_0001_0010,
-        0b0000_0000_0010_0010_0010_0001_0001_0010,
-        0b0000_0000_0010_0001_0001_0001_0001_0010,
-        0b0000_0000_0010_0010_0010_0010_0010_0010,
-    ]);
-    OBJ_TILES.as_region().get(3).unwrap().write([
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0000_0000_0000_0000_0000_0000_0000_0000,
-        0b0010_0010_0010_0000_0000_0000_0000_0000,
-        0b0010_0001_0010_0000_0000_0000_0000_0000,
-        0b0010_0001_0010_0010_0000_0000_0000_0000,
-        0b0010_0001_0001_0010_0010_0010_0000_0000,
-        0b0010_0001_0001_0001_0001_0010_0000_0000,
-        0b0010_0010_0010_0010_0010_0010_0000_0000,
-    ]);
+    let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
+    let bytes = aligned_bytes.as_u32_slice();
+    let len = bytes.len() / 8;
+    let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
+    OBJ_TILES
+        .as_region()
+        .sub_slice(..len)
+        .write_from_slice(tiles);
 
     // Hide other objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
