@@ -7,11 +7,11 @@ mod position;
 mod turn;
 
 pub use direction::Direction;
+pub use grid::Grid;
+pub use node::Node;
 pub use position::Position;
 
 use core::num::NonZeroU16;
-use grid::Grid;
-use node::Node;
 use turn::Turn;
 
 #[derive(Clone, Copy, Debug)]
@@ -215,6 +215,10 @@ impl Game {
 
         self.increment_turn();
         Ok(Conclusion::Undecided)
+    }
+
+    pub fn grid(&self) -> &Grid {
+        &self.grid
     }
 }
 

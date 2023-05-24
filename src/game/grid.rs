@@ -1,5 +1,5 @@
 use super::{Color, ColorCounts, Node, Position};
-use core::num::NonZeroU16;
+use core::{num::NonZeroU16, slice};
 
 #[derive(Debug)]
 pub struct Grid([[Node; 16]; 16]);
@@ -43,5 +43,9 @@ impl Grid {
             yellow: yellow_count.try_into().ok(),
             green: green_count.try_into().ok(),
         }
+    }
+
+    pub fn iter(&self) -> slice::Iter<[Node; 16]> {
+        self.0.iter()
     }
 }

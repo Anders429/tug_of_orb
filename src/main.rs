@@ -4,17 +4,17 @@
 mod game;
 
 use core::slice;
-use game::{Direction, Game, Position};
+use game::{Direction, Game, Grid, Node, Position};
 use gba::{
     bios::VBlankIntrWait,
     interrupts::IrqBits,
     mmio::{
-        obj_palbank, BG0CNT, DISPCNT, DISPSTAT, IE, IME, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL,
-        OBJ_TILES,
+        bg_palbank, obj_palbank, BG0CNT, CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE, IME, KEYINPUT,
+        OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
     },
     video::{
         obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
-        BackgroundControl, Color, DisplayControl, DisplayStatus, VideoMode,
+        BackgroundControl, Color, DisplayControl, DisplayStatus, TextEntry, VideoMode,
     },
     Align4,
 };
@@ -73,7 +73,7 @@ extern "C" fn main() -> ! {
     IME.write(true);
 
     // Configure BG0 tilemap.
-    BG0CNT.write(BackgroundControl::new().with_screenblock(31));
+    BG0CNT.write(BackgroundControl::new().with_screenblock(8));
     // Set BG0 to be displayed.
     DISPCNT.write(
         DisplayControl::new()
@@ -83,11 +83,22 @@ extern "C" fn main() -> ! {
     );
 
     let mut state = State {
-        game: Game::builder().build(),
+        game: Game::builder()
+            .grid(Grid::new([[Node::Wall; 16]; 16]))
+            .build(),
 
         cursor: Position { x: 0, y: 0 },
     };
     log::info!("{:?}", state);
+
+    // Define the neutral palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/neutral.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        bg_palbank(0).index(index).write(Color(*bytes));
+    }
 
     // Define cursor palette.
     for (index, bytes) in Align4(*include_bytes!("../res/cursor.pal"))
@@ -98,7 +109,17 @@ extern "C" fn main() -> ! {
         obj_palbank(0).index(index).write(Color(*bytes));
     }
 
-    // Define the tiles.
+    // Define the wall tiles.
+    let aligned_bytes = Align4(*include_bytes!("../res/wall.4bpp"));
+    let bytes = aligned_bytes.as_u32_slice();
+    let len = bytes.len() / 8;
+    let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
+    CHARBLOCK0_4BPP
+        .as_region()
+        .sub_slice(1..len + 1)
+        .write_from_slice(tiles);
+
+    // Define the cursor tiles.
     let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
     let bytes = aligned_bytes.as_u32_slice();
     let len = bytes.len() / 8;
@@ -107,6 +128,49 @@ extern "C" fn main() -> ! {
         .as_region()
         .sub_slice(..len)
         .write_from_slice(tiles);
+
+    // Draw the initial game state.
+    for (y, row) in state.game.grid().iter().enumerate() {
+        for (x, node) in row.iter().enumerate() {
+            match node {
+                Node::Wall => {
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2)
+                        .unwrap()
+                        .get(x * 2)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(1));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2)
+                        .unwrap()
+                        .get(x * 2 + 1)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(2));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2 + 1)
+                        .unwrap()
+                        .get(x * 2)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(3));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2 + 1)
+                        .unwrap()
+                        .get(x * 2 + 1)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(4));
+                }
+                _ => {}
+            }
+        }
+    }
 
     // Hide other objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
