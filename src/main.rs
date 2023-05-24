@@ -97,12 +97,16 @@ extern "C" fn main() -> ! {
 
     let mut state = State {
         game: Game::builder()
-            .grid(Grid::new([[Node::Wall; 16]; 16]))
+            .grid(Grid::new(
+                [[Node::Arrow {
+                    direction: Direction::Right,
+                    alignment: None,
+                }; 16]; 16],
+            ))
             .build(),
 
         cursor: Position { x: 0, y: 0 },
     };
-    log::info!("{:?}", state);
 
     // Define the neutral palette.
     for (index, bytes) in Align4(*include_bytes!("../res/neutral.pal"))
@@ -209,6 +213,77 @@ extern "C" fn main() -> ! {
                         .unwrap()
                         .write(TextEntry::new().with_tile(4));
                 }
+                Node::Arrow { direction, .. } => match direction {
+                    Direction::Left => {
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(9));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(10));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(11));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(12));
+                    }
+                    Direction::Right => {
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(5));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(6));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(7));
+                        TEXT_SCREENBLOCKS
+                            .get_frame(8)
+                            .unwrap()
+                            .get_row(y * 2 + 1)
+                            .unwrap()
+                            .get(x * 2 + 1)
+                            .unwrap()
+                            .write(TextEntry::new().with_tile(8));
+                    }
+                    _ => {}
+                },
                 _ => {}
             }
         }
