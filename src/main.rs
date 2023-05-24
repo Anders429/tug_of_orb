@@ -70,6 +70,77 @@ macro_rules! load_tiles {
     };
 }
 
+fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2)
+        .unwrap()
+        .get(x * 2)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2)
+        .unwrap()
+        .get(x * 2 + 1)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2 + 1)
+        .unwrap()
+        .get(x * 2)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2 + 1)
+        .unwrap()
+        .get(x * 2 + 1)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile));
+}
+
+// Set the tiles for an (x, y) position to group of four sequential tiles.
+fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2)
+        .unwrap()
+        .get(x * 2)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile_start));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2)
+        .unwrap()
+        .get(x * 2 + 1)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile_start + 1));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2 + 1)
+        .unwrap()
+        .get(x * 2)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile_start + 2));
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .unwrap()
+        .get_row(y * 2 + 1)
+        .unwrap()
+        .get(x * 2 + 1)
+        .unwrap()
+        .write(TextEntry::new().with_tile(tile_start + 3));
+}
+
 /// Entry point for the game.
 #[no_mangle]
 extern "C" fn main() -> ! {
@@ -148,209 +219,23 @@ extern "C" fn main() -> ! {
         for (x, node) in row.iter().enumerate() {
             match node {
                 Node::Empty => {
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2)
-                        .unwrap()
-                        .get(x * 2)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2)
-                        .unwrap()
-                        .get(x * 2 + 1)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2 + 1)
-                        .unwrap()
-                        .get(x * 2)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2 + 1)
-                        .unwrap()
-                        .get(x * 2 + 1)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0));
+                    set_tile(x, y, 0, 8);
                 }
                 Node::Wall => {
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2)
-                        .unwrap()
-                        .get(x * 2)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(1));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2)
-                        .unwrap()
-                        .get(x * 2 + 1)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(2));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2 + 1)
-                        .unwrap()
-                        .get(x * 2)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(3));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(8)
-                        .unwrap()
-                        .get_row(y * 2 + 1)
-                        .unwrap()
-                        .get(x * 2 + 1)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(4));
+                    set_tile_group(x, y, 1, 8);
                 }
                 Node::Arrow { direction, .. } => match direction {
                     Direction::Left => {
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(9));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(10));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(11));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(12));
+                        set_tile_group(x, y, 9, 8);
                     }
                     Direction::Right => {
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(5));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(6));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(7));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(8));
+                        set_tile_group(x, y, 5, 8);
                     }
                     Direction::Down => {
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(13));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(14));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(15));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(16));
+                        set_tile_group(x, y, 13, 8);
                     }
                     Direction::Up => {
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(17));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(18));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(19));
-                        TEXT_SCREENBLOCKS
-                            .get_frame(8)
-                            .unwrap()
-                            .get_row(y * 2 + 1)
-                            .unwrap()
-                            .get(x * 2 + 1)
-                            .unwrap()
-                            .write(TextEntry::new().with_tile(20));
+                        set_tile_group(x, y, 17, 8);
                     }
                     _ => {}
                 },
