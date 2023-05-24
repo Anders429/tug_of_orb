@@ -57,6 +57,19 @@ struct State {
     game: Game,
 }
 
+macro_rules! load_tiles {
+    ($file_name:literal, $offset:expr) => {
+        let aligned_bytes = Align4(*include_bytes!($file_name));
+        let bytes = aligned_bytes.as_u32_slice();
+        let len = bytes.len() / 8;
+        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
+        CHARBLOCK0_4BPP
+            .as_region()
+            .sub_slice($offset..len + $offset)
+            .write_from_slice(tiles);
+    };
+}
+
 /// Entry point for the game.
 #[no_mangle]
 extern "C" fn main() -> ! {
@@ -109,15 +122,10 @@ extern "C" fn main() -> ! {
         obj_palbank(0).index(index).write(Color(*bytes));
     }
 
-    // Define the wall tiles.
-    let aligned_bytes = Align4(*include_bytes!("../res/wall.4bpp"));
-    let bytes = aligned_bytes.as_u32_slice();
-    let len = bytes.len() / 8;
-    let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-    CHARBLOCK0_4BPP
-        .as_region()
-        .sub_slice(1..len + 1)
-        .write_from_slice(tiles);
+    // Define the game tiles.
+    load_tiles!("../res/wall.4bpp", 1);
+    load_tiles!("../res/arrow_right.4bpp", 5);
+    load_tiles!("../res/arrow_left.4bpp", 9);
 
     // Define the cursor tiles.
     let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
