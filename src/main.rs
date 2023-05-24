@@ -129,12 +129,17 @@ extern "C" fn main() -> ! {
 
     let mut state = State {
         game: Game::builder()
-            .grid(Grid::new(
-                [[Node::Arrow {
+            .grid(Grid::new({
+                let mut grid = [[Node::Arrow {
                     direction: Direction::Right,
                     alignment: None,
-                }; 16]; 16],
-            ))
+                }; 16]; 16];
+                grid[0][0] = Node::Arrow {
+                    direction: Direction::Up,
+                    alignment: Some(game::Color::Red),
+                };
+                grid
+            }))
             .build(),
 
         cursor: Position { x: 0, y: 0 },
@@ -147,6 +152,14 @@ extern "C" fn main() -> ! {
         .enumerate()
     {
         bg_palbank(0).index(index).write(Color(*bytes));
+    }
+    // Define the red palette.
+    for (index, bytes) in Align4(*include_bytes!("../res/red.pal"))
+        .as_u16_slice()
+        .iter()
+        .enumerate()
+    {
+        bg_palbank(1).index(index).write(Color(*bytes));
     }
 
     // Define cursor palette.
@@ -185,21 +198,30 @@ extern "C" fn main() -> ! {
                 Node::Wall => {
                     set_tile_group(x, y, 1, 8, 0);
                 }
-                Node::Arrow { direction, .. } => match direction {
-                    Direction::Left => {
-                        set_tile_group(x, y, 9, 8, 0);
+                Node::Arrow {
+                    direction,
+                    alignment,
+                } => {
+                    let palette = match alignment {
+                        Some(game::Color::Red) => 1,
+                        _ => 0,
+                    };
+                    match direction {
+                        Direction::Left => {
+                            set_tile_group(x, y, 9, 8, palette);
+                        }
+                        Direction::Right => {
+                            set_tile_group(x, y, 5, 8, palette);
+                        }
+                        Direction::Down => {
+                            set_tile_group(x, y, 13, 8, palette);
+                        }
+                        Direction::Up => {
+                            set_tile_group(x, y, 17, 8, palette);
+                        }
+                        _ => {}
                     }
-                    Direction::Right => {
-                        set_tile_group(x, y, 5, 8, 0);
-                    }
-                    Direction::Down => {
-                        set_tile_group(x, y, 13, 8, 0);
-                    }
-                    Direction::Up => {
-                        set_tile_group(x, y, 17, 8, 0);
-                    }
-                    _ => {}
-                },
+                }
                 _ => {}
             }
         }
