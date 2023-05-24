@@ -70,7 +70,7 @@ macro_rules! load_tiles {
     };
 }
 
-fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
+fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -78,7 +78,7 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
         .unwrap()
         .get(x * 2)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile));
+        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -86,7 +86,7 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
         .unwrap()
         .get(x * 2 + 1)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile));
+        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -94,7 +94,7 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
         .unwrap()
         .get(x * 2)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile));
+        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -102,11 +102,11 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize) {
         .unwrap()
         .get(x * 2 + 1)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile));
+        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
 }
 
 // Set the tiles for an (x, y) position to group of four sequential tiles.
-fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
+fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize, palette: u16) {
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -114,7 +114,7 @@ fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
         .unwrap()
         .get(x * 2)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile_start));
+        .write(TextEntry::new().with_tile(tile_start).with_palbank(palette));
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -122,7 +122,11 @@ fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
         .unwrap()
         .get(x * 2 + 1)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile_start + 1));
+        .write(
+            TextEntry::new()
+                .with_tile(tile_start + 1)
+                .with_palbank(palette),
+        );
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -130,7 +134,11 @@ fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
         .unwrap()
         .get(x * 2)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile_start + 2));
+        .write(
+            TextEntry::new()
+                .with_tile(tile_start + 2)
+                .with_palbank(palette),
+        );
     TEXT_SCREENBLOCKS
         .get_frame(frame)
         .unwrap()
@@ -138,7 +146,11 @@ fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize) {
         .unwrap()
         .get(x * 2 + 1)
         .unwrap()
-        .write(TextEntry::new().with_tile(tile_start + 3));
+        .write(
+            TextEntry::new()
+                .with_tile(tile_start + 3)
+                .with_palbank(palette),
+        );
 }
 
 /// Entry point for the game.
@@ -219,23 +231,23 @@ extern "C" fn main() -> ! {
         for (x, node) in row.iter().enumerate() {
             match node {
                 Node::Empty => {
-                    set_tile(x, y, 0, 8);
+                    set_tile(x, y, 0, 8, 0);
                 }
                 Node::Wall => {
-                    set_tile_group(x, y, 1, 8);
+                    set_tile_group(x, y, 1, 8, 0);
                 }
                 Node::Arrow { direction, .. } => match direction {
                     Direction::Left => {
-                        set_tile_group(x, y, 9, 8);
+                        set_tile_group(x, y, 9, 8, 0);
                     }
                     Direction::Right => {
-                        set_tile_group(x, y, 5, 8);
+                        set_tile_group(x, y, 5, 8, 0);
                     }
                     Direction::Down => {
-                        set_tile_group(x, y, 13, 8);
+                        set_tile_group(x, y, 13, 8, 0);
                     }
                     Direction::Up => {
-                        set_tile_group(x, y, 17, 8);
+                        set_tile_group(x, y, 17, 8, 0);
                     }
                     _ => {}
                 },
