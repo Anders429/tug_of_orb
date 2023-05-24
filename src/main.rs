@@ -141,6 +141,40 @@ extern "C" fn main() -> ! {
     for (y, row) in state.game.grid().iter().enumerate() {
         for (x, node) in row.iter().enumerate() {
             match node {
+                Node::Empty => {
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2)
+                        .unwrap()
+                        .get(x * 2)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2)
+                        .unwrap()
+                        .get(x * 2 + 1)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2 + 1)
+                        .unwrap()
+                        .get(x * 2)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(8)
+                        .unwrap()
+                        .get_row(y * 2 + 1)
+                        .unwrap()
+                        .get(x * 2 + 1)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0));
+                }
                 Node::Wall => {
                     TEXT_SCREENBLOCKS
                         .get_frame(8)
