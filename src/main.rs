@@ -70,87 +70,33 @@ macro_rules! load_tiles {
     };
 }
 
+/// Sets an individual screenblock.
+///
+/// This is basically just writing a single 8x8 tile.
+fn set_block(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
+    TEXT_SCREENBLOCKS
+        .get_frame(frame)
+        .expect("invalid frame")
+        .get_row(y)
+        .expect("invalid row")
+        .get(x)
+        .expect("invalid column")
+        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
+}
+
 fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2)
-        .unwrap()
-        .get(x * 2)
-        .unwrap()
-        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2)
-        .unwrap()
-        .get(x * 2 + 1)
-        .unwrap()
-        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2 + 1)
-        .unwrap()
-        .get(x * 2)
-        .unwrap()
-        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2 + 1)
-        .unwrap()
-        .get(x * 2 + 1)
-        .unwrap()
-        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
+    set_block(x * 2, y * 2, tile, frame, palette);
+    set_block(x * 2 + 2, y * 2, tile, frame, palette);
+    set_block(x * 2 + 1, y * 2 + 1, tile, frame, palette);
+    set_block(x * 2 + 1, y * 2 + 1, tile, frame, palette);
 }
 
 // Set the tiles for an (x, y) position to group of four sequential tiles.
 fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize, palette: u16) {
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2)
-        .unwrap()
-        .get(x * 2)
-        .unwrap()
-        .write(TextEntry::new().with_tile(tile_start).with_palbank(palette));
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2)
-        .unwrap()
-        .get(x * 2 + 1)
-        .unwrap()
-        .write(
-            TextEntry::new()
-                .with_tile(tile_start + 1)
-                .with_palbank(palette),
-        );
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2 + 1)
-        .unwrap()
-        .get(x * 2)
-        .unwrap()
-        .write(
-            TextEntry::new()
-                .with_tile(tile_start + 2)
-                .with_palbank(palette),
-        );
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .unwrap()
-        .get_row(y * 2 + 1)
-        .unwrap()
-        .get(x * 2 + 1)
-        .unwrap()
-        .write(
-            TextEntry::new()
-                .with_tile(tile_start + 3)
-                .with_palbank(palette),
-        );
+    set_block(x * 2, y * 2, tile_start, frame, palette);
+    set_block(x * 2 + 1, y * 2, tile_start + 1, frame, palette);
+    set_block(x * 2, y * 2 + 1, tile_start + 2, frame, palette);
+    set_block(x * 2 + 1, y * 2 + 1, tile_start + 3, frame, palette);
 }
 
 /// Entry point for the game.
