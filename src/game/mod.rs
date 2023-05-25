@@ -10,11 +10,11 @@ pub use direction::Direction;
 pub use grid::Grid;
 pub use node::Node;
 pub use position::Position;
+pub use turn::Turn;
 
 use core::num::NonZeroU16;
-use turn::Turn;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Color {
     // Player colors.
     Red,
@@ -97,26 +97,15 @@ impl Game {
         }
     }
 
-    fn change_color_counts(&mut self, increment: Color, decrement: Option<Color>) {
-        match increment {
-            Color::Red => match self.color_counts.red.as_mut() {
-                Some(count) => *count = count.checked_add(1).expect("red count overflowed"),
-                None => self.color_counts.red = Some(unsafe { NonZeroU16::new_unchecked(1) }),
-            },
-
-            _ => {}
-        }
-    }
-
     /// Fill in the current color beginning at the given position.
-    fn fill(&mut self, position: Position) {
+    fn fill(&mut self, position: Position, first: bool) {
         // Ensure this is a valid position.
         let node = match self.grid.get_mut(position) {
             Some(node) => node,
             None => return,
         };
         let old_color = node.color();
-        if !node.set_color(self.turn_color) {
+        if !first && !node.set_color(self.turn_color) {
             // Stop if the color was not changed; that means we have already been this direction
             // before.
             return;
@@ -126,7 +115,7 @@ impl Game {
         // Deal with the node this node points to.
         if let Some(direction) = node.direction() {
             if let Some(new_position) = position.r#move(direction) {
-                self.fill(new_position);
+                self.fill(new_position, false);
             }
         }
 
@@ -140,7 +129,7 @@ impl Game {
             if let Some(new_position) = position.r#move(direction) {
                 if let Some(new_node) = self.grid.get(new_position) {
                     if new_node.direction() == Some(direction.opposite()) {
-                        self.fill(new_position);
+                        self.fill(new_position, false);
                     }
                 }
             }
@@ -211,9 +200,16 @@ impl Game {
         }
 
         node.rotate();
-        self.fill(turn.rotate);
+        self.fill(turn.rotate, true);
 
         self.increment_turn();
+
+        log::info!(
+            "turn_color: {:?}, counts: {:?}",
+            self.turn_color,
+            self.color_counts
+        );
+
         Ok(Conclusion::Undecided)
     }
 

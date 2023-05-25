@@ -4,7 +4,7 @@
 mod game;
 
 use core::slice;
-use game::{Direction, Game, Grid, Node, Position};
+use game::{Direction, Game, Grid, Node, Position, Turn};
 use gba::{
     bios::VBlankIntrWait,
     interrupts::IrqBits,
@@ -55,6 +55,51 @@ struct State {
     cursor: game::Position,
 
     game: Game,
+}
+
+impl State {
+    fn draw(&self) {
+        for (y, row) in self.game.grid().iter().enumerate() {
+            for (x, node) in row.iter().enumerate() {
+                match node {
+                    Node::Empty => {
+                        set_tile(x, y, 0, 8, 0);
+                    }
+                    Node::Wall => {
+                        set_tile_group(x, y, 1, 8, 0);
+                    }
+                    Node::Arrow {
+                        direction,
+                        alignment,
+                    } => {
+                        let palette = match alignment {
+                            Some(game::Color::Red) => 1,
+                            Some(game::Color::Blue) => 2,
+                            Some(game::Color::Yellow) => 3,
+                            Some(game::Color::Green) => 4,
+                            _ => 0,
+                        };
+                        match direction {
+                            Direction::Left => {
+                                set_tile_group(x, y, 9, 8, palette);
+                            }
+                            Direction::Right => {
+                                set_tile_group(x, y, 5, 8, palette);
+                            }
+                            Direction::Down => {
+                                set_tile_group(x, y, 13, 8, palette);
+                            }
+                            Direction::Up => {
+                                set_tile_group(x, y, 17, 8, palette);
+                            }
+                            _ => {}
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
 }
 
 macro_rules! load_tiles {
@@ -225,46 +270,7 @@ extern "C" fn main() -> ! {
         .write_from_slice(tiles);
 
     // Draw the initial game state.
-    for (y, row) in state.game.grid().iter().enumerate() {
-        for (x, node) in row.iter().enumerate() {
-            match node {
-                Node::Empty => {
-                    set_tile(x, y, 0, 8, 0);
-                }
-                Node::Wall => {
-                    set_tile_group(x, y, 1, 8, 0);
-                }
-                Node::Arrow {
-                    direction,
-                    alignment,
-                } => {
-                    let palette = match alignment {
-                        Some(game::Color::Red) => 1,
-                        Some(game::Color::Blue) => 2,
-                        Some(game::Color::Yellow) => 3,
-                        Some(game::Color::Green) => 4,
-                        _ => 0,
-                    };
-                    match direction {
-                        Direction::Left => {
-                            set_tile_group(x, y, 9, 8, palette);
-                        }
-                        Direction::Right => {
-                            set_tile_group(x, y, 5, 8, palette);
-                        }
-                        Direction::Down => {
-                            set_tile_group(x, y, 13, 8, palette);
-                        }
-                        Direction::Up => {
-                            set_tile_group(x, y, 17, 8, palette);
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
+    state.draw();
 
     // Hide other objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
@@ -290,6 +296,17 @@ extern "C" fn main() -> ! {
         }
         if keys.down() {
             state.cursor = state.cursor.move_saturating(Direction::Down, MAX_POSITION);
+        }
+        if keys.a() {
+            if state
+                .game
+                .execute_turn(Turn {
+                    rotate: state.cursor,
+                })
+                .is_ok()
+            {
+                state.draw();
+            }
         }
 
         VBlankIntrWait();

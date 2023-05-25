@@ -20,7 +20,7 @@ impl Node {
 
     pub fn is_color(&self, color: Color) -> bool {
         match self {
-            Self::Arrow { alignment, .. } => matches!(alignment, Some(color)),
+            Self::Arrow { alignment, .. } => *alignment == Some(color),
             _ => false,
         }
     }
@@ -45,7 +45,8 @@ impl Node {
     /// If the alignment was already `color`, then `false` is returned.
     pub fn set_color(&mut self, color: Color) -> bool {
         if let Node::Arrow { alignment, .. } = self {
-            if matches!(alignment, Some(color)) {
+            if *alignment == Some(color) {
+                log::info!("matched");
                 false
             } else {
                 *alignment = Some(color);
