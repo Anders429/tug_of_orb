@@ -8,6 +8,7 @@ use game::{Direction, Game, Grid, Node, Position, Turn};
 use gba::{
     bios::VBlankIntrWait,
     interrupts::IrqBits,
+    keys::KeyInput,
     mmio::{
         bg_palbank, obj_palbank, BG0CNT, CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE, IME, KEYINPUT,
         OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
@@ -277,27 +278,29 @@ extern "C" fn main() -> ! {
         address.write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed))
     });
 
+    let mut prev_keys = KeyInput::new();
+
     loop {
         // Read keys for each frame.
         let keys = KEYINPUT.read();
 
-        if keys.start() {
+        if keys.start() && !prev_keys.start() {
             log::info!("cursor: {:?}", state.cursor);
         }
         const MAX_POSITION: Position = Position { x: 15, y: 15 };
-        if keys.right() {
+        if keys.right() && !prev_keys.right() {
             state.cursor = state.cursor.move_saturating(Direction::Right, MAX_POSITION);
         }
-        if keys.up() {
+        if keys.up() && !prev_keys.up() {
             state.cursor = state.cursor.move_saturating(Direction::Up, MAX_POSITION);
         }
-        if keys.left() {
+        if keys.left() && !prev_keys.left() {
             state.cursor = state.cursor.move_saturating(Direction::Left, MAX_POSITION);
         }
-        if keys.down() {
+        if keys.down() && !prev_keys.down() {
             state.cursor = state.cursor.move_saturating(Direction::Down, MAX_POSITION);
         }
-        if keys.a() {
+        if keys.a() && !prev_keys.a() {
             if state
                 .game
                 .execute_turn(Turn {
@@ -308,6 +311,8 @@ extern "C" fn main() -> ! {
                 state.draw();
             }
         }
+
+        prev_keys = keys;
 
         VBlankIntrWait();
 
