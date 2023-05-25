@@ -3,15 +3,15 @@
 
 mod game;
 
-use core::slice;
+use core::{ops::BitOrAssign, slice};
 use game::{Direction, Game, Grid, Node, Position, Turn};
 use gba::{
     bios::VBlankIntrWait,
     interrupts::IrqBits,
     keys::KeyInput,
     mmio::{
-        bg_palbank, obj_palbank, BG0CNT, CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE, IME, KEYINPUT,
-        OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
+        bg_palbank, obj_palbank, BG0CNT, BG1CNT, BG2CNT, CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE,
+        IME, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
     },
     video::{
         obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
@@ -51,6 +51,41 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
+#[derive(Clone, Copy, Debug)]
+struct Edges(u8);
+
+impl Edges {
+    const LEFT: Edges = Edges(0b0000_0001);
+    const UP: Edges = Edges(0b0000_0010);
+    const RIGHT: Edges = Edges(0b0000_0100);
+    const DOWN: Edges = Edges(0b0000_1000);
+
+    fn new() -> Self {
+        Self(0)
+    }
+
+    fn contains(&self, other: Self) -> bool {
+        self.0 & other.0 == other.0
+    }
+}
+
+impl From<Direction> for Edges {
+    fn from(direction: Direction) -> Self {
+        match direction {
+            Direction::Left => Edges::LEFT,
+            Direction::Up => Edges::UP,
+            Direction::Right => Edges::RIGHT,
+            Direction::Down => Edges::DOWN,
+        }
+    }
+}
+
+impl BitOrAssign for Edges {
+    fn bitor_assign(&mut self, rhs: Self) {
+        self.0 |= rhs.0;
+    }
+}
+
 #[derive(Debug)]
 struct State {
     cursor: game::Position,
@@ -60,14 +95,41 @@ struct State {
 
 impl State {
     fn draw(&self) {
+        // Calculate node edges.
+        let mut edges = [[Edges::new(); 16]; 16];
         for (y, row) in self.game.grid().iter().enumerate() {
             for (x, node) in row.iter().enumerate() {
-                match node {
+                if let Some(direction) = node.direction() {
+                    edges[y][x] |= direction.into();
+                    // Update the edges of the pointed-at node.
+                    if let Some(position) = (Position {
+                        x: x as u8,
+                        y: y as u8,
+                    })
+                    .r#move(direction)
+                    {
+                        if let Some(other_node_edges) = edges
+                            .get_mut(position.y as usize)
+                            .map(|row| row.get_mut(position.x as usize))
+                            .flatten()
+                        {
+                            *other_node_edges |= direction.opposite().into();
+                        }
+                    }
+                }
+            }
+        }
+
+        for (y, row) in self.game.grid().iter().zip(edges).enumerate() {
+            for (x, (node, edges)) in row.0.iter().zip(row.1).enumerate() {
+                let palette = match node {
                     Node::Empty => {
-                        set_tile(x, y, 0, 8, 0);
+                        set_tile(x, y, 0, 24, 0);
+                        0
                     }
                     Node::Wall => {
-                        set_tile_group(x, y, 1, 8, 0);
+                        set_tile_group(x, y, 1, 24, 0);
+                        0
                     }
                     Node::Arrow {
                         direction,
@@ -82,21 +144,53 @@ impl State {
                         };
                         match direction {
                             Direction::Left => {
-                                set_tile_group(x, y, 9, 8, palette);
+                                set_tile_group(x, y, 9, 24, palette);
                             }
                             Direction::Right => {
-                                set_tile_group(x, y, 5, 8, palette);
+                                set_tile_group(x, y, 5, 24, palette);
                             }
                             Direction::Down => {
-                                set_tile_group(x, y, 13, 8, palette);
+                                set_tile_group(x, y, 13, 24, palette);
                             }
                             Direction::Up => {
-                                set_tile_group(x, y, 17, 8, palette);
+                                set_tile_group(x, y, 17, 24, palette);
                             }
                             _ => {}
                         }
+                        palette
                     }
-                    _ => {}
+                    _ => 0,
+                };
+
+                // Handle each corner of the edge tile separately.
+
+                // Top left
+                match (edges.contains(Edges::LEFT), edges.contains(Edges::UP)) {
+                    (false, false) => set_block(2 * x, 2 * y, 21, 16, palette),
+                    (true, false) => set_block(2 * x, 2 * y, 22, 16, palette),
+                    (false, true) => set_block(2 * x, 2 * y, 23, 16, palette),
+                    (true, true) => set_block(2 * x, 2 * y, 24, 16, palette),
+                }
+                // Top right
+                match (edges.contains(Edges::RIGHT), edges.contains(Edges::UP)) {
+                    (false, false) => set_block(2 * x + 1, 2 * y, 25, 16, palette),
+                    (true, false) => set_block(2 * x + 1, 2 * y, 26, 16, palette),
+                    (false, true) => set_block(2 * x + 1, 2 * y, 27, 16, palette),
+                    (true, true) => set_block(2 * x + 1, 2 * y, 28, 16, palette),
+                }
+                // Bottom left
+                match (edges.contains(Edges::LEFT), edges.contains(Edges::DOWN)) {
+                    (false, false) => set_block(2 * x, 2 * y + 1, 29, 16, palette),
+                    (true, false) => set_block(2 * x, 2 * y + 1, 30, 16, palette),
+                    (false, true) => set_block(2 * x, 2 * y + 1, 31, 16, palette),
+                    (true, true) => set_block(2 * x, 2 * y + 1, 32, 16, palette),
+                }
+                // Bottom right
+                match (edges.contains(Edges::RIGHT), edges.contains(Edges::DOWN)) {
+                    (false, false) => set_block(2 * x + 1, 2 * y + 1, 33, 16, palette),
+                    (true, false) => set_block(2 * x + 1, 2 * y + 1, 34, 16, palette),
+                    (false, true) => set_block(2 * x + 1, 2 * y + 1, 35, 16, palette),
+                    (true, true) => set_block(2 * x + 1, 2 * y + 1, 36, 16, palette),
                 }
             }
         }
@@ -163,12 +257,20 @@ extern "C" fn main() -> ! {
     // Enable interrupts generally.
     IME.write(true);
 
-    // Configure BG0 tilemap.
-    BG0CNT.write(BackgroundControl::new().with_screenblock(8));
-    // Set BG0 to be displayed.
+    BG1CNT.write(
+        BackgroundControl::new()
+            .with_screenblock(16)
+            .with_priority(2),
+    );
+    BG2CNT.write(
+        BackgroundControl::new()
+            .with_screenblock(24)
+            .with_priority(1),
+    );
     DISPCNT.write(
         DisplayControl::new()
-            .with_show_bg0(true)
+            .with_show_bg1(true)
+            .with_show_bg2(true)
             .with_show_obj(true)
             .with_obj_vram_1d(true),
     );
@@ -259,6 +361,22 @@ extern "C" fn main() -> ! {
     load_tiles!("../res/arrow_left.4bpp", 9);
     load_tiles!("../res/arrow_down.4bpp", 13);
     load_tiles!("../res/arrow_up.4bpp", 17);
+    load_tiles!("../res/grid0.4bpp", 21);
+    load_tiles!("../res/grid0_left.4bpp", 22);
+    load_tiles!("../res/grid0_up.4bpp", 23);
+    load_tiles!("../res/grid0_left_up.4bpp", 24);
+    load_tiles!("../res/grid1.4bpp", 25);
+    load_tiles!("../res/grid1_right.4bpp", 26);
+    load_tiles!("../res/grid1_up.4bpp", 27);
+    load_tiles!("../res/grid1_right_up.4bpp", 28);
+    load_tiles!("../res/grid2.4bpp", 29);
+    load_tiles!("../res/grid2_left.4bpp", 30);
+    load_tiles!("../res/grid2_down.4bpp", 31);
+    load_tiles!("../res/grid2_left_down.4bpp", 32);
+    load_tiles!("../res/grid3.4bpp", 33);
+    load_tiles!("../res/grid3_right.4bpp", 34);
+    load_tiles!("../res/grid3_down.4bpp", 35);
+    load_tiles!("../res/grid3_right_down.4bpp", 36);
 
     // Define the cursor tiles.
     let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
