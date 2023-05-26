@@ -10,8 +10,9 @@ use gba::{
     interrupts::IrqBits,
     keys::KeyInput,
     mmio::{
-        bg_palbank, obj_palbank, BG0CNT, BG1CNT, BG2CNT, CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE,
-        IME, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
+        bg_palbank, obj_palbank, BG0CNT, BG1CNT, BG1HOFS, BG1VOFS, BG2CNT, BG2HOFS, BG2VOFS,
+        CHARBLOCK0_4BPP, DISPCNT, DISPSTAT, IE, IME, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES,
+        TEXT_SCREENBLOCKS,
     },
     video::{
         obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
@@ -86,6 +87,21 @@ impl BitOrAssign for Edges {
     }
 }
 
+// Returns x, y, and frame.
+fn get_screen_location(mut x: usize, mut y: usize, mut frame: usize) -> (usize, usize, usize) {
+    x = x + 8;
+    y = y + 8;
+    if x >= 16 {
+        x -= 16;
+        frame += 1;
+    }
+    if y >= 16 {
+        y -= 16;
+        frame += 2;
+    }
+    (x, y, frame)
+}
+
 #[derive(Debug)]
 struct State {
     cursor: game::Position,
@@ -122,14 +138,16 @@ impl State {
 
         for (y, row) in self.game.grid().iter().zip(edges).enumerate() {
             for (x, (node, edges)) in row.0.iter().zip(row.1).enumerate() {
+                let (x, y, frame) = get_screen_location(x, y, 24);
+
                 // Draw node.
                 let palette = match node {
                     Node::Empty => {
-                        set_tile(x, y, 0, 24, 0);
+                        set_tile(x, y, 0, frame, 0);
                         0
                     }
                     Node::Wall => {
-                        set_tile_group(x, y, 1, 24, 0);
+                        set_tile_group(x, y, 1, frame, 0);
                         0
                     }
                     Node::Arrow {
@@ -145,16 +163,16 @@ impl State {
                         };
                         match direction {
                             Direction::Left => {
-                                set_tile_group(x, y, 9, 24, palette);
+                                set_tile_group(x, y, 9, frame, palette);
                             }
                             Direction::Right => {
-                                set_tile_group(x, y, 5, 24, palette);
+                                set_tile_group(x, y, 5, frame, palette);
                             }
                             Direction::Down => {
-                                set_tile_group(x, y, 13, 24, palette);
+                                set_tile_group(x, y, 13, frame, palette);
                             }
                             Direction::Up => {
-                                set_tile_group(x, y, 17, 24, palette);
+                                set_tile_group(x, y, 17, frame, palette);
                             }
                             _ => {}
                         }
@@ -167,31 +185,31 @@ impl State {
 
                 // Top left
                 match (edges.contains(Edges::LEFT), edges.contains(Edges::UP)) {
-                    (false, false) => set_block(2 * x, 2 * y, 21, 16, palette),
-                    (true, false) => set_block(2 * x, 2 * y, 22, 16, palette),
-                    (false, true) => set_block(2 * x, 2 * y, 23, 16, palette),
-                    (true, true) => set_block(2 * x, 2 * y, 24, 16, palette),
+                    (false, false) => set_block(2 * x, 2 * y, 21, frame - 8, palette),
+                    (true, false) => set_block(2 * x, 2 * y, 22, frame - 8, palette),
+                    (false, true) => set_block(2 * x, 2 * y, 23, frame - 8, palette),
+                    (true, true) => set_block(2 * x, 2 * y, 24, frame - 8, palette),
                 }
                 // Top right
                 match (edges.contains(Edges::RIGHT), edges.contains(Edges::UP)) {
-                    (false, false) => set_block(2 * x + 1, 2 * y, 25, 16, palette),
-                    (true, false) => set_block(2 * x + 1, 2 * y, 26, 16, palette),
-                    (false, true) => set_block(2 * x + 1, 2 * y, 27, 16, palette),
-                    (true, true) => set_block(2 * x + 1, 2 * y, 28, 16, palette),
+                    (false, false) => set_block(2 * x + 1, 2 * y, 25, frame - 8, palette),
+                    (true, false) => set_block(2 * x + 1, 2 * y, 26, frame - 8, palette),
+                    (false, true) => set_block(2 * x + 1, 2 * y, 27, frame - 8, palette),
+                    (true, true) => set_block(2 * x + 1, 2 * y, 28, frame - 8, palette),
                 }
                 // Bottom left
                 match (edges.contains(Edges::LEFT), edges.contains(Edges::DOWN)) {
-                    (false, false) => set_block(2 * x, 2 * y + 1, 29, 16, palette),
-                    (true, false) => set_block(2 * x, 2 * y + 1, 30, 16, palette),
-                    (false, true) => set_block(2 * x, 2 * y + 1, 31, 16, palette),
-                    (true, true) => set_block(2 * x, 2 * y + 1, 32, 16, palette),
+                    (false, false) => set_block(2 * x, 2 * y + 1, 29, frame - 8, palette),
+                    (true, false) => set_block(2 * x, 2 * y + 1, 30, frame - 8, palette),
+                    (false, true) => set_block(2 * x, 2 * y + 1, 31, frame - 8, palette),
+                    (true, true) => set_block(2 * x, 2 * y + 1, 32, frame - 8, palette),
                 }
                 // Bottom right
                 match (edges.contains(Edges::RIGHT), edges.contains(Edges::DOWN)) {
-                    (false, false) => set_block(2 * x + 1, 2 * y + 1, 33, 16, palette),
-                    (true, false) => set_block(2 * x + 1, 2 * y + 1, 34, 16, palette),
-                    (false, true) => set_block(2 * x + 1, 2 * y + 1, 35, 16, palette),
-                    (true, true) => set_block(2 * x + 1, 2 * y + 1, 36, 16, palette),
+                    (false, false) => set_block(2 * x + 1, 2 * y + 1, 33, frame - 8, palette),
+                    (true, false) => set_block(2 * x + 1, 2 * y + 1, 34, frame - 8, palette),
+                    (false, true) => set_block(2 * x + 1, 2 * y + 1, 35, frame - 8, palette),
+                    (true, true) => set_block(2 * x + 1, 2 * y + 1, 36, frame - 8, palette),
                 }
             }
         }
@@ -418,6 +436,7 @@ extern "C" fn main() -> ! {
     loop {
         // Read keys for each frame.
         let keys = KEYINPUT.read();
+        let mut state_changed = false;
 
         if keys.start() && !prev_keys.start() {
             log::info!("cursor: {:?}", state.cursor);
@@ -443,7 +462,7 @@ extern "C" fn main() -> ! {
                 })
                 .is_ok()
             {
-                state.draw();
+                state_changed = true;
             }
         }
 
@@ -453,11 +472,21 @@ extern "C" fn main() -> ! {
 
         // Draw the cursor.
         let mut obj = ObjAttr::new();
-        obj.set_x(state.cursor.x as u16 * 16);
-        obj.set_y(state.cursor.y as u16 * 16);
+        obj.set_x(state.cursor.x as u16 * 8 + 52);
+        obj.set_y(state.cursor.y as u16 * 4 + 42);
         obj.set_tile_id(0);
         obj.set_palbank(0);
         obj.1 = obj.1.with_size(1);
         OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+
+        if state_changed {
+            state.draw();
+        }
+
+        // Scroll
+        BG1HOFS.write(state.cursor.x as u16 * 8 + 76);
+        BG1VOFS.write(state.cursor.y as u16 * 12 + 86);
+        BG2HOFS.write(state.cursor.x as u16 * 8 + 76);
+        BG2VOFS.write(state.cursor.y as u16 * 12 + 86);
     }
 }
