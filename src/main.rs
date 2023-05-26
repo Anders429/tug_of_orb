@@ -122,9 +122,6 @@ impl State {
 
         for (y, row) in self.game.grid().iter().zip(edges).enumerate() {
             for (x, (node, edges)) in row.0.iter().zip(row.1).enumerate() {
-                // Draw background.
-                set_tile(x, y, 37, 8, 1);
-
                 // Draw node.
                 let palette = match node {
                     Node::Empty => {
@@ -269,12 +266,14 @@ extern "C" fn main() -> ! {
     BG1CNT.write(
         BackgroundControl::new()
             .with_screenblock(16)
-            .with_priority(2),
+            .with_priority(2)
+            .with_size(3),
     );
     BG2CNT.write(
         BackgroundControl::new()
             .with_screenblock(24)
-            .with_priority(1),
+            .with_priority(1)
+            .with_size(3),
     );
     DISPCNT.write(
         DisplayControl::new()
@@ -401,6 +400,13 @@ extern "C" fn main() -> ! {
 
     // Draw the initial game state.
     state.draw();
+
+    // Draw background.
+    for y in 0..16 {
+        for x in 0..16 {
+            set_tile(x, y, 37, 8, 1);
+        }
+    }
 
     // Hide unused objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
