@@ -401,59 +401,77 @@ impl Game {
     }
 
     pub fn run(&mut self) {
-        // Read keys for each frame.
-        let keys = KEYINPUT.read();
-        let mut state_changed = false;
+        if self.state.turn_color() == self.player_color {
+            // Read keys for each frame.
+            let keys = KEYINPUT.read();
+            let mut state_changed = false;
 
-        if keys.start() && !self.prev_keys.start() {
-            log::info!("cursor: {:?}", self.cursor);
-        }
-        const MAX_POSITION: Position = Position { x: 15, y: 15 };
-        if keys.right() && !self.prev_keys.right() {
-            self.cursor = self.cursor.move_saturating(Direction::Right, MAX_POSITION);
-        }
-        if keys.up() && !self.prev_keys.up() {
-            self.cursor = self.cursor.move_saturating(Direction::Up, MAX_POSITION);
-        }
-        if keys.left() && !self.prev_keys.left() {
-            self.cursor = self.cursor.move_saturating(Direction::Left, MAX_POSITION);
-        }
-        if keys.down() && !self.prev_keys.down() {
-            self.cursor = self.cursor.move_saturating(Direction::Down, MAX_POSITION);
-        }
-        if keys.a() && !self.prev_keys.a() {
-            if self
-                .state
-                .execute_turn(Turn {
-                    rotate: self.cursor,
-                })
-                .is_ok()
-            {
-                state_changed = true;
+            if keys.start() && !self.prev_keys.start() {
+                log::info!("cursor: {:?}", self.cursor);
+            }
+            const MAX_POSITION: Position = Position { x: 15, y: 15 };
+            if keys.right() && !self.prev_keys.right() {
+                self.cursor = self.cursor.move_saturating(Direction::Right, MAX_POSITION);
+            }
+            if keys.up() && !self.prev_keys.up() {
+                self.cursor = self.cursor.move_saturating(Direction::Up, MAX_POSITION);
+            }
+            if keys.left() && !self.prev_keys.left() {
+                self.cursor = self.cursor.move_saturating(Direction::Left, MAX_POSITION);
+            }
+            if keys.down() && !self.prev_keys.down() {
+                self.cursor = self.cursor.move_saturating(Direction::Down, MAX_POSITION);
+            }
+            if keys.a() && !self.prev_keys.a() {
+                if self
+                    .state
+                    .execute_turn(Turn {
+                        rotate: self.cursor,
+                    })
+                    .is_ok()
+                {
+                    state_changed = true;
+                }
+            }
+
+            self.prev_keys = keys;
+
+            VBlankIntrWait();
+
+            // Draw the cursor.
+            let mut obj = ObjAttr::new();
+            obj.set_x(self.cursor.x as u16 * 8 + 52);
+            obj.set_y(self.cursor.y as u16 * 4 + 42);
+            obj.set_tile_id(0);
+            obj.set_palbank(0);
+            obj.1 = obj.1.with_size(1);
+            OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+
+            if state_changed {
+                self.draw();
+            }
+
+            // Scroll.
+            BG1HOFS.write(self.cursor.x as u16 * 8 + 76);
+            BG1VOFS.write(self.cursor.y as u16 * 12 + 86);
+            BG2HOFS.write(self.cursor.x as u16 * 8 + 76);
+            BG2VOFS.write(self.cursor.y as u16 * 12 + 86);
+        } else {
+            'outer: for x in 0..16 {
+                for y in 0..16 {
+                    if self
+                        .state
+                        .execute_turn(Turn {
+                            rotate: Position { x, y },
+                        })
+                        .is_ok()
+                    {
+                        VBlankIntrWait();
+                        self.draw();
+                        break 'outer;
+                    }
+                }
             }
         }
-
-        self.prev_keys = keys;
-
-        VBlankIntrWait();
-
-        // Draw the cursor.
-        let mut obj = ObjAttr::new();
-        obj.set_x(self.cursor.x as u16 * 8 + 52);
-        obj.set_y(self.cursor.y as u16 * 4 + 42);
-        obj.set_tile_id(0);
-        obj.set_palbank(0);
-        obj.1 = obj.1.with_size(1);
-        OBJ_ATTR_ALL.get(0).unwrap().write(obj);
-
-        if state_changed {
-            self.draw();
-        }
-
-        // Scroll.
-        BG1HOFS.write(self.cursor.x as u16 * 8 + 76);
-        BG1VOFS.write(self.cursor.y as u16 * 12 + 86);
-        BG2HOFS.write(self.cursor.x as u16 * 8 + 76);
-        BG2VOFS.write(self.cursor.y as u16 * 12 + 86);
     }
 }

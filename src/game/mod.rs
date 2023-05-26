@@ -216,6 +216,10 @@ impl Game {
     pub fn grid(&self) -> &Grid {
         &self.grid
     }
+
+    pub fn turn_color(&self) -> Color {
+        self.turn_color
+    }
 }
 
 /// Helper for building game state.
