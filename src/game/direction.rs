@@ -24,4 +24,22 @@ impl Direction {
             Self::Down => Self::Up,
         }
     }
+
+    pub fn clockwise(&self) -> Direction {
+        match self {
+            Self::Left => Self::Up,
+            Self::Up => Self::Right,
+            Self::Right => Self::Down,
+            Self::Down => Self::Left,
+        }
+    }
+
+    pub fn counter_clockwise(&self) -> Direction {
+        match self {
+            Self::Left => Self::Down,
+            Self::Up => Self::Left,
+            Self::Right => Self::Up,
+            Self::Down => Self::Right,
+        }
+    }
 }

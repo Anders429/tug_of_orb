@@ -1,5 +1,6 @@
-use super::{Color, ColorCounts, Node, Position};
+use super::{Color, ColorCounts, Direction, Node, Position};
 use core::{num::NonZeroU16, slice};
+use gba::random::{Gen32, Lcg32};
 
 #[derive(Debug)]
 pub struct Grid([[Node; 16]; 16]);
@@ -7,6 +8,85 @@ pub struct Grid([[Node; 16]; 16]);
 impl Grid {
     pub fn new(grid: [[Node; 16]; 16]) -> Self {
         Self(grid)
+    }
+
+    fn populate_reflected_arrows(&mut self, x: usize, y: usize, direction: Direction) {
+        self.0[y][x] = Node::Arrow {
+            alignment: None,
+            direction,
+        };
+        self.0[y][15 - x] = Node::Arrow {
+            alignment: None,
+            direction: direction.clockwise(),
+        };
+        self.0[15 - y][x] = Node::Arrow {
+            alignment: None,
+            direction: direction.counter_clockwise(),
+        };
+        self.0[15 - y][15 - x] = Node::Arrow {
+            alignment: None,
+            direction: direction.opposite(),
+        };
+    }
+
+    /// Generate a random grid.
+    pub fn generate(seed: u32) -> Self {
+        let mut grid = Grid([[Node::Empty; 16]; 16]);
+
+        // Starting positions.
+        grid.0[0][0] = Node::Arrow {
+            alignment: Some(Color::Red),
+            direction: Direction::Up,
+        };
+        grid.0[0][15] = Node::Arrow {
+            alignment: Some(Color::Blue),
+            direction: Direction::Right,
+        };
+        grid.0[15][0] = Node::Arrow {
+            alignment: Some(Color::Yellow),
+            direction: Direction::Left,
+        };
+        grid.0[15][15] = Node::Arrow {
+            alignment: Some(Color::Green),
+            direction: Direction::Down,
+        };
+
+        let mut lcg = Lcg32::new(seed);
+        for y in 0..8 {
+            for x in 0..8 {
+                // Already did the starting positions.
+                if x == 0 && y == 0 {
+                    continue;
+                }
+                let rand = lcg.next_u8();
+                lcg.jump_state(1);
+                log::info!("{:?}", lcg);
+                log::info!("{}", rand);
+                match rand % 5 {
+                    0 => {
+                        grid.populate_reflected_arrows(x, y, Direction::Left);
+                    }
+                    1 => {
+                        grid.populate_reflected_arrows(x, y, Direction::Up);
+                    }
+                    2 => {
+                        grid.populate_reflected_arrows(x, y, Direction::Right);
+                    }
+                    3 => {
+                        grid.populate_reflected_arrows(x, y, Direction::Down);
+                    }
+                    4 => {
+                        grid.0[y][x] = Node::Wall;
+                        grid.0[y][15 - x] = Node::Wall;
+                        grid.0[15 - y][x] = Node::Wall;
+                        grid.0[15 - y][15 - x] = Node::Wall;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        grid
     }
 
     pub fn get(&self, position: Position) -> Option<&Node> {

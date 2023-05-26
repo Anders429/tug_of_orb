@@ -60,31 +60,7 @@ extern "C" fn main() -> ! {
 
     let mut screen = Screen::Game(screen::Game::new(
         Position { x: 0, y: 0 },
-        Game::builder()
-            .grid(Grid::new({
-                let mut grid = [[Node::Arrow {
-                    direction: Direction::Right,
-                    alignment: None,
-                }; 16]; 16];
-                grid[0][0] = Node::Arrow {
-                    direction: Direction::Up,
-                    alignment: Some(Color::Red),
-                };
-                grid[0][1] = Node::Arrow {
-                    direction: Direction::Up,
-                    alignment: Some(Color::Blue),
-                };
-                grid[0][2] = Node::Arrow {
-                    direction: Direction::Up,
-                    alignment: Some(Color::Yellow),
-                };
-                grid[0][3] = Node::Arrow {
-                    direction: Direction::Up,
-                    alignment: Some(Color::Green),
-                };
-                grid
-            }))
-            .build(),
+        Game::builder().grid(Grid::generate(1234567)).build(),
         Color::Red,
     ));
 
