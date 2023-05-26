@@ -122,6 +122,10 @@ impl State {
 
         for (y, row) in self.game.grid().iter().zip(edges).enumerate() {
             for (x, (node, edges)) in row.0.iter().zip(row.1).enumerate() {
+                // Draw background.
+                set_tile(x, y, 37, 8, 1);
+
+                // Draw node.
                 let palette = match node {
                     Node::Empty => {
                         set_tile(x, y, 0, 24, 0);
@@ -229,8 +233,8 @@ fn set_block(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
 /// This tile will be used four times, as an (x, y) position occupies four tile spaces.
 fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
     set_block(x * 2, y * 2, tile, frame, palette);
-    set_block(x * 2 + 2, y * 2, tile, frame, palette);
-    set_block(x * 2 + 1, y * 2 + 1, tile, frame, palette);
+    set_block(x * 2 + 1, y * 2, tile, frame, palette);
+    set_block(x * 2, y * 2 + 1, tile, frame, palette);
     set_block(x * 2 + 1, y * 2 + 1, tile, frame, palette);
 }
 
@@ -257,6 +261,11 @@ extern "C" fn main() -> ! {
     // Enable interrupts generally.
     IME.write(true);
 
+    BG0CNT.write(
+        BackgroundControl::new()
+            .with_screenblock(8)
+            .with_priority(3),
+    );
     BG1CNT.write(
         BackgroundControl::new()
             .with_screenblock(16)
@@ -269,6 +278,7 @@ extern "C" fn main() -> ! {
     );
     DISPCNT.write(
         DisplayControl::new()
+            .with_show_bg0(true)
             .with_show_bg1(true)
             .with_show_bg2(true)
             .with_show_obj(true)
@@ -377,6 +387,7 @@ extern "C" fn main() -> ! {
     load_tiles!("../res/grid3_right.4bpp", 34);
     load_tiles!("../res/grid3_down.4bpp", 35);
     load_tiles!("../res/grid3_right_down.4bpp", 36);
+    load_tiles!("../res/background.4bpp", 37);
 
     // Define the cursor tiles.
     let aligned_bytes = Align4(*include_bytes!("../res/cursor.4bpp"));
@@ -391,7 +402,7 @@ extern "C" fn main() -> ! {
     // Draw the initial game state.
     state.draw();
 
-    // Hide other objects.
+    // Hide unused objects.
     OBJ_ATTR0.iter().skip(1).for_each(|address| {
         address.write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed))
     });
