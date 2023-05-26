@@ -85,6 +85,7 @@ extern "C" fn main() -> ! {
                 grid
             }))
             .build(),
+        Color::Red,
     ));
 
     loop {

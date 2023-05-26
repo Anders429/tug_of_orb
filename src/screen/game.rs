@@ -119,10 +119,11 @@ pub struct Game {
     prev_keys: KeyInput,
 
     state: game::Game,
+    player_color: game::Color,
 }
 
 impl Game {
-    pub fn new(cursor: Position, game: game::Game) -> Self {
+    pub fn new(cursor: Position, game: game::Game, player_color: game::Color) -> Self {
         VBlankIntrWait();
 
         // Initialize fade.
@@ -264,7 +265,9 @@ impl Game {
         let state = Self {
             cursor,
             prev_keys: KeyInput::new(),
+
             state: game,
+            player_color,
         };
 
         // Draw the initial game state.
