@@ -8,11 +8,12 @@ use gba::{
     keys::KeyInput,
     mmio::{
         bg_palbank, obj_palbank, BG0CNT, BG1CNT, BG1HOFS, BG1VOFS, BG2CNT, BG2HOFS, BG2VOFS,
-        CHARBLOCK0_4BPP, DISPCNT, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES, TEXT_SCREENBLOCKS,
+        BLDCNT, BLDY, CHARBLOCK0_4BPP, DISPCNT, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES,
+        TEXT_SCREENBLOCKS,
     },
     video::{
         obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
-        BackgroundControl, Color, DisplayControl, TextEntry,
+        BackgroundControl, BlendControl, Color, ColorEffectMode, DisplayControl, TextEntry,
     },
     Align4,
 };
@@ -122,6 +123,21 @@ pub struct Game {
 
 impl Game {
     pub fn new(cursor: Position, game: game::Game) -> Self {
+        VBlankIntrWait();
+
+        // Initialize fade.
+        BLDCNT.write(
+            BlendControl::new()
+                .with_target1_bg0(true)
+                .with_target1_bg1(true)
+                .with_target1_bg2(true)
+                .with_target1_bg3(true)
+                .with_target1_obj(true)
+                .with_mode(ColorEffectMode::Brighten),
+        );
+        BLDY.write(16);
+
+        // Set up background layers.
         BG0CNT.write(
             BackgroundControl::new()
                 .with_screenblock(8)
@@ -252,6 +268,27 @@ impl Game {
 
         // Draw the initial game state.
         state.draw();
+
+        // Draw the cursor.
+        let mut obj = ObjAttr::new();
+        obj.set_x(state.cursor.x as u16 * 8 + 52);
+        obj.set_y(state.cursor.y as u16 * 4 + 42);
+        obj.set_tile_id(0);
+        obj.set_palbank(0);
+        obj.1 = obj.1.with_size(1);
+        OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+
+        // Scroll.
+        BG1HOFS.write(state.cursor.x as u16 * 8 + 76);
+        BG1VOFS.write(state.cursor.y as u16 * 12 + 86);
+        BG2HOFS.write(state.cursor.x as u16 * 8 + 76);
+        BG2VOFS.write(state.cursor.y as u16 * 12 + 86);
+
+        // Fade in.
+        for fade in (0..31).rev() {
+            VBlankIntrWait();
+            BLDY.write(fade / 2);
+        }
 
         state
     }
