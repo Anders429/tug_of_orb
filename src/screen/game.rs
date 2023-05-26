@@ -135,6 +135,7 @@ impl Game {
                 .with_target1_obj(true)
                 .with_mode(ColorEffectMode::Brighten),
         );
+        // Fade out while we set up the screen.
         BLDY.write(16);
 
         // Set up background layers.
