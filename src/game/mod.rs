@@ -113,9 +113,22 @@ impl Game {
         self.color_counts.change(self.turn_color, old_color);
 
         // Deal with the node this node points to.
-        if let Some(direction) = node.direction() {
-            if let Some(new_position) = position.r#move(direction) {
-                self.fill(new_position, false);
+        if !node.is_hidden() {
+            if let Some(direction) = node.direction() {
+                if let Some(new_position) = position.r#move(direction) {
+                    self.fill(new_position, false);
+                }
+            } else if node.all_directions() {
+                for direction in [
+                    Direction::Left,
+                    Direction::Up,
+                    Direction::Right,
+                    Direction::Down,
+                ] {
+                    if let Some(new_position) = position.r#move(direction) {
+                        self.fill(new_position, false);
+                    }
+                }
             }
         }
 
@@ -128,8 +141,12 @@ impl Game {
         ] {
             if let Some(new_position) = position.r#move(direction) {
                 if let Some(new_node) = self.grid.get(new_position) {
-                    if new_node.direction() == Some(direction.opposite()) {
-                        self.fill(new_position, false);
+                    if !new_node.is_hidden() {
+                        if new_node.direction() == Some(direction.opposite())
+                            || new_node.all_directions()
+                        {
+                            self.fill(new_position, false);
+                        }
                     }
                 }
             }

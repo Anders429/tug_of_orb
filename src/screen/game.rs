@@ -316,6 +316,7 @@ impl Game {
         load_tiles!("../../res/grid3_down.4bpp", 35);
         load_tiles!("../../res/grid3_right_down.4bpp", 36);
         load_tiles!("../../res/background.4bpp", 37);
+        load_tiles!("../../res/arrow_all.4bpp", 38);
 
         // Define the cursor tiles.
         let aligned_bytes = Align4(*include_bytes!("../../res/cursor.4bpp"));
@@ -382,28 +383,61 @@ impl Game {
         let mut edges = [[Edges::new(); 16]; 16];
         for (y, row) in self.state.grid().iter().enumerate() {
             for (x, node) in row.iter().enumerate() {
-                if let Some(direction) = node.direction() {
-                    if (direction == Direction::Up && y == 0)
-                        || (direction == Direction::Left && x == 0)
-                        || (direction == Direction::Down && y == 15)
-                        || (direction == Direction::Right && x == 15)
-                    {
-                        continue;
-                    }
-                    edges[y][x] |= direction.into();
-                    // Update the edges of the pointed-at node.
-                    if let Some(position) = (Position {
-                        x: x as u8,
-                        y: y as u8,
-                    })
-                    .r#move(direction)
-                    {
-                        if let Some(other_node_edges) = edges
-                            .get_mut(position.y as usize)
-                            .map(|row| row.get_mut(position.x as usize))
-                            .flatten()
+                if !node.is_hidden() {
+                    if let Some(direction) = node.direction() {
+                        if (direction == Direction::Up && y == 0)
+                            || (direction == Direction::Left && x == 0)
+                            || (direction == Direction::Down && y == 15)
+                            || (direction == Direction::Right && x == 15)
                         {
-                            *other_node_edges |= direction.opposite().into();
+                            continue;
+                        }
+                        edges[y][x] |= direction.into();
+                        // Update the edges of the pointed-at node.
+                        if let Some(position) = (Position {
+                            x: x as u8,
+                            y: y as u8,
+                        })
+                        .r#move(direction)
+                        {
+                            if let Some(other_node_edges) = edges
+                                .get_mut(position.y as usize)
+                                .map(|row| row.get_mut(position.x as usize))
+                                .flatten()
+                            {
+                                *other_node_edges |= direction.opposite().into();
+                            }
+                        }
+                    } else if node.all_directions() {
+                        for direction in [
+                            Direction::Left,
+                            Direction::Up,
+                            Direction::Right,
+                            Direction::Down,
+                        ] {
+                            if (direction == Direction::Up && y == 0)
+                                || (direction == Direction::Left && x == 0)
+                                || (direction == Direction::Down && y == 15)
+                                || (direction == Direction::Right && x == 15)
+                            {
+                                continue;
+                            }
+                            edges[y][x] |= direction.into();
+                            // Update the edges of the pointed-at node.
+                            if let Some(position) = (Position {
+                                x: x as u8,
+                                y: y as u8,
+                            })
+                            .r#move(direction)
+                            {
+                                if let Some(other_node_edges) = edges
+                                    .get_mut(position.y as usize)
+                                    .map(|row| row.get_mut(position.x as usize))
+                                    .flatten()
+                                {
+                                    *other_node_edges |= direction.opposite().into();
+                                }
+                            }
                         }
                     }
                 }
@@ -448,6 +482,21 @@ impl Game {
                             Direction::Up => {
                                 set_tile_group(x, y, 17, frame, palette);
                             }
+                        }
+                        palette
+                    }
+                    Node::AllDirection { alignment } => {
+                        let palette = match alignment {
+                            Some(game::Color::Red) => 1,
+                            Some(game::Color::Blue) => 2,
+                            Some(game::Color::Yellow) => 3,
+                            Some(game::Color::Green) => 4,
+                            _ => 0,
+                        };
+                        if alignment.is_some() {
+                            set_tile_group(x, y, 38, frame, palette);
+                        } else {
+                            set_tile_group(x, y, 1, frame, palette);
                         }
                         palette
                     }

@@ -29,6 +29,15 @@ impl Grid {
         };
     }
 
+    fn populate_wall(&mut self, x: usize, y: usize, lcg: &mut Lcg32) {
+        let rand = lcg.next_u8();
+        lcg.jump_state(1);
+        match rand {
+            0..=63 => self.0[y][x] = Node::AllDirection { alignment: None },
+            64..=255 => self.0[y][x] = Node::Wall,
+        }
+    }
+
     /// Generate a random grid.
     pub fn generate(seed: u32) -> Self {
         let mut grid = Grid([[Node::Empty; 16]; 16]);
@@ -87,10 +96,10 @@ impl Grid {
                         } else if y == 0 {
                             grid.populate_reflected_arrows(x, y, Direction::Right)
                         } else {
-                            grid.0[y][x] = Node::Wall;
-                            grid.0[x][15 - y] = Node::Wall;
-                            grid.0[15 - x][y] = Node::Wall;
-                            grid.0[15 - y][15 - x] = Node::Wall;
+                            grid.populate_wall(x, y, &mut lcg);
+                            grid.populate_wall(15 - y, x, &mut lcg);
+                            grid.populate_wall(y, 15 - x, &mut lcg);
+                            grid.populate_wall(15 - x, 15 - y, &mut lcg);
                         }
                     }
                     _ => {}
