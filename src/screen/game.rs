@@ -636,7 +636,7 @@ impl Game {
 
                         VBlankIntrWait();
                         self.draw();
-                        wait_frames(60);
+                        wait_frames(30);
                         break 'outer;
                     }
                 }
