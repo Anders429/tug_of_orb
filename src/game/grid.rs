@@ -62,10 +62,18 @@ impl Grid {
                 lcg.jump_state(1);
                 match rand {
                     0..=60 => {
-                        grid.populate_reflected_arrows(x, y, Direction::Left);
+                        if x == 1 && y == 0 {
+                            grid.populate_reflected_arrows(x, y, Direction::Up);
+                        } else {
+                            grid.populate_reflected_arrows(x, y, Direction::Left);
+                        }
                     }
                     61..=120 => {
-                        grid.populate_reflected_arrows(x, y, Direction::Up);
+                        if x == 0 && y == 1 {
+                            grid.populate_reflected_arrows(x, y, Direction::Left);
+                        } else {
+                            grid.populate_reflected_arrows(x, y, Direction::Up);
+                        }
                     }
                     121..=180 => {
                         grid.populate_reflected_arrows(x, y, Direction::Right);

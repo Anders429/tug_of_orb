@@ -196,7 +196,7 @@ pub struct Game {
     player_color: game::Color,
 
     scroll_accelerator: ScrollAccelerator,
-    scroll_at_start_of_player_turn: bool
+    scroll_at_start_of_player_turn: bool,
 }
 
 impl Game {
@@ -527,7 +527,8 @@ impl Game {
 
             // Scroll.
             if self.scroll_at_start_of_player_turn {
-                self.scroll_at_start_of_player_turn = !self.scroll_accelerator.scroll_to_position(self.cursor, 2);
+                self.scroll_at_start_of_player_turn =
+                    !self.scroll_accelerator.scroll_to_position(self.cursor, 2);
             } else {
                 self.scroll_accelerator.scroll_to_position(self.cursor, 1);
             }
