@@ -304,6 +304,13 @@ impl Game {
         for (y, row) in self.state.grid().iter().enumerate() {
             for (x, node) in row.iter().enumerate() {
                 if let Some(direction) = node.direction() {
+                    if (direction == Direction::Up && y == 0)
+                        || (direction == Direction::Left && x == 0)
+                        || (direction == Direction::Down && y == 15)
+                        || (direction == Direction::Right && x == 15)
+                    {
+                        continue;
+                    }
                     edges[y][x] |= direction.into();
                     // Update the edges of the pointed-at node.
                     if let Some(position) = (Position {
