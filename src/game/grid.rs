@@ -60,22 +60,20 @@ impl Grid {
                 }
                 let rand = lcg.next_u8();
                 lcg.jump_state(1);
-                log::info!("{:?}", lcg);
-                log::info!("{}", rand);
-                match rand % 5 {
-                    0 => {
+                match rand {
+                    0..=60 => {
                         grid.populate_reflected_arrows(x, y, Direction::Left);
                     }
-                    1 => {
+                    61..=120 => {
                         grid.populate_reflected_arrows(x, y, Direction::Up);
                     }
-                    2 => {
+                    121..=180 => {
                         grid.populate_reflected_arrows(x, y, Direction::Right);
                     }
-                    3 => {
+                    181..=240 => {
                         grid.populate_reflected_arrows(x, y, Direction::Down);
                     }
-                    4 => {
+                    241..=255 => {
                         grid.0[y][x] = Node::Wall;
                         grid.0[x][15 - y] = Node::Wall;
                         grid.0[15 - x][y] = Node::Wall;
