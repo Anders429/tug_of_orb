@@ -82,10 +82,16 @@ impl Grid {
                         grid.populate_reflected_arrows(x, y, Direction::Down);
                     }
                     241..=255 => {
-                        grid.0[y][x] = Node::Wall;
-                        grid.0[x][15 - y] = Node::Wall;
-                        grid.0[15 - x][y] = Node::Wall;
-                        grid.0[15 - y][15 - x] = Node::Wall;
+                        if x == 0 {
+                            grid.populate_reflected_arrows(x, y, Direction::Down)
+                        } else if y == 0 {
+                            grid.populate_reflected_arrows(x, y, Direction::Right)
+                        } else {
+                            grid.0[y][x] = Node::Wall;
+                            grid.0[x][15 - y] = Node::Wall;
+                            grid.0[15 - x][y] = Node::Wall;
+                            grid.0[15 - y][15 - x] = Node::Wall;
+                        }
                     }
                     _ => {}
                 }
