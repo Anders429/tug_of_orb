@@ -58,11 +58,7 @@ extern "C" fn main() -> ! {
     // Enable interrupts generally.
     IME.write(true);
 
-    let mut screen = Screen::Game(screen::Game::new(
-        Position { x: 0, y: 0 },
-        Game::builder().grid(Grid::generate(1234567)).build(),
-        Color::Red,
-    ));
+    let mut screen = Screen::default();
 
     loop {
         screen.run();

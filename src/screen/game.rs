@@ -1,3 +1,4 @@
+use super::Screen;
 use crate::{
     game,
     game::{Direction, Node, Position, Turn},
@@ -400,7 +401,7 @@ impl Game {
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Option<Screen> {
         if self.state.turn_color() == self.player_color {
             // Read keys for each frame.
             let keys = KEYINPUT.read();
@@ -473,5 +474,7 @@ impl Game {
                 }
             }
         }
+
+        None
     }
 }
