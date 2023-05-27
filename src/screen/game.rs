@@ -114,6 +114,19 @@ fn get_screen_location(mut x: usize, mut y: usize, mut frame: usize) -> (usize, 
     (x, y, frame)
 }
 
+fn scroll_screen_to_position(position: Position) {
+    BG1HOFS.write(position.x as u16 * 8 + 76);
+    BG1VOFS.write(position.y as u16 * 12 + 86);
+    BG2HOFS.write(position.x as u16 * 8 + 76);
+    BG2VOFS.write(position.y as u16 * 12 + 86);
+}
+
+fn wait_frames(num: usize) {
+    for _ in 0..num {
+        VBlankIntrWait();
+    }
+}
+
 #[derive(Debug)]
 pub struct Game {
     cursor: Position,
@@ -460,10 +473,7 @@ impl Game {
             }
 
             // Scroll.
-            BG1HOFS.write(self.cursor.x as u16 * 8 + 76);
-            BG1VOFS.write(self.cursor.y as u16 * 12 + 86);
-            BG2HOFS.write(self.cursor.x as u16 * 8 + 76);
-            BG2VOFS.write(self.cursor.y as u16 * 12 + 86);
+            scroll_screen_to_position(self.cursor);
         } else {
             'outer: for x in 0..16 {
                 for y in 0..16 {
@@ -475,7 +485,9 @@ impl Game {
                         .is_ok()
                     {
                         VBlankIntrWait();
+                        scroll_screen_to_position(Position { x, y });
                         self.draw();
+                        wait_frames(60);
                         break 'outer;
                     }
                 }
