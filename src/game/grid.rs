@@ -15,13 +15,13 @@ impl Grid {
             alignment: None,
             direction,
         };
-        self.0[y][15 - x] = Node::Arrow {
-            alignment: None,
-            direction: direction.clockwise(),
-        };
-        self.0[15 - y][x] = Node::Arrow {
+        self.0[15 - x][y] = Node::Arrow {
             alignment: None,
             direction: direction.counter_clockwise(),
+        };
+        self.0[x][15 - y] = Node::Arrow {
+            alignment: None,
+            direction: direction.clockwise(),
         };
         self.0[15 - y][15 - x] = Node::Arrow {
             alignment: None,
@@ -77,8 +77,8 @@ impl Grid {
                     }
                     4 => {
                         grid.0[y][x] = Node::Wall;
-                        grid.0[y][15 - x] = Node::Wall;
-                        grid.0[15 - y][x] = Node::Wall;
+                        grid.0[x][15 - y] = Node::Wall;
+                        grid.0[15 - x][y] = Node::Wall;
                         grid.0[15 - y][15 - x] = Node::Wall;
                     }
                     _ => {}
