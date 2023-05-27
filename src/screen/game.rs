@@ -114,15 +114,6 @@ fn get_screen_location(mut x: usize, mut y: usize, mut frame: usize) -> (usize, 
     (x, y, frame)
 }
 
-fn scroll_screen_to_position(position: Position) {
-    let target = (position.x as u16 * 8 + 76, position.y as u16 * 12 + 86);
-
-    BG1HOFS.write(position.x as u16 * 8 + 76);
-    BG1VOFS.write(position.y as u16 * 12 + 86);
-    BG2HOFS.write(position.x as u16 * 8 + 76);
-    BG2VOFS.write(position.y as u16 * 12 + 86);
-}
-
 fn wait_frames(num: usize) {
     for _ in 0..num {
         VBlankIntrWait();
@@ -145,19 +136,19 @@ impl ScrollAccelerator {
         (position.x as u16 * 8 + 76, position.y as u16 * 12 + 86)
     }
 
-    fn scroll_to_position(&mut self, position: Position) -> bool {
+    fn scroll_to_position(&mut self, position: Position, velocity: u16) -> bool {
         let target = Self::position_to_pixel_location(position);
         let x = if (self.position.0 > target.0) {
-            self.position.0 - 1
+            self.position.0 - velocity
         } else if (self.position.0 < target.0) {
-            self.position.0 + 1
+            self.position.0 + velocity
         } else {
             self.position.0
         };
         let y = if (self.position.1 > target.1) {
-            self.position.1 - 1
+            self.position.1 - velocity
         } else if (self.position.1 < target.1) {
-            self.position.1 + 1
+            self.position.1 + velocity
         } else {
             self.position.1
         };
@@ -205,6 +196,7 @@ pub struct Game {
     player_color: game::Color,
 
     scroll_accelerator: ScrollAccelerator,
+    scroll_at_start_of_player_turn: bool
 }
 
 impl Game {
@@ -355,6 +347,7 @@ impl Game {
             player_color,
 
             scroll_accelerator: ScrollAccelerator::new(cursor),
+            scroll_at_start_of_player_turn: false,
         };
 
         // Draw the initial game state.
@@ -532,6 +525,13 @@ impl Game {
 
             VBlankIntrWait();
 
+            // Scroll.
+            if self.scroll_at_start_of_player_turn {
+                self.scroll_at_start_of_player_turn = !self.scroll_accelerator.scroll_to_position(self.cursor, 2);
+            } else {
+                self.scroll_accelerator.scroll_to_position(self.cursor, 1);
+            }
+
             // Draw the cursor.
             if let Some(obj_pixel_pos) = self
                 .scroll_accelerator
@@ -549,12 +549,7 @@ impl Game {
             if state_changed {
                 self.draw();
             }
-
-            // Scroll.
-            self.scroll_accelerator.scroll_to_position(self.cursor);
         } else {
-            // // Hide cursor.
-            // OBJ_ATTR0.get(0).unwrap().write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed));
             'outer: for x in 0..16 {
                 for y in 0..16 {
                     if self
@@ -569,7 +564,7 @@ impl Game {
                             VBlankIntrWait();
                             let completed = self
                                 .scroll_accelerator
-                                .scroll_to_position(Position { x, y });
+                                .scroll_to_position(Position { x, y }, 2);
 
                             if let Some(obj_pixel_pos) = self
                                 .scroll_accelerator
@@ -596,6 +591,7 @@ impl Game {
                     }
                 }
             }
+            self.scroll_at_start_of_player_turn = true;
         }
 
         None
