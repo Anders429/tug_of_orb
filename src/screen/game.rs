@@ -115,6 +115,8 @@ fn get_screen_location(mut x: usize, mut y: usize, mut frame: usize) -> (usize, 
 }
 
 fn scroll_screen_to_position(position: Position) {
+    let target = (position.x as u16 * 8 + 76, position.y as u16 * 12 + 86);
+
     BG1HOFS.write(position.x as u16 * 8 + 76);
     BG1VOFS.write(position.y as u16 * 12 + 86);
     BG2HOFS.write(position.x as u16 * 8 + 76);
@@ -128,12 +130,81 @@ fn wait_frames(num: usize) {
 }
 
 #[derive(Debug)]
+struct ScrollAccelerator {
+    position: (u16, u16),
+}
+
+impl ScrollAccelerator {
+    fn new(position: Position) -> Self {
+        Self {
+            position: Self::position_to_pixel_location(position),
+        }
+    }
+
+    fn position_to_pixel_location(position: Position) -> (u16, u16) {
+        (position.x as u16 * 8 + 76, position.y as u16 * 12 + 86)
+    }
+
+    fn scroll_to_position(&mut self, position: Position) -> bool {
+        let target = Self::position_to_pixel_location(position);
+        let x = if (self.position.0 > target.0) {
+            self.position.0 - 1
+        } else if (self.position.0 < target.0) {
+            self.position.0 + 1
+        } else {
+            self.position.0
+        };
+        let y = if (self.position.1 > target.1) {
+            self.position.1 - 1
+        } else if (self.position.1 < target.1) {
+            self.position.1 + 1
+        } else {
+            self.position.1
+        };
+        BG1HOFS.write(x);
+        BG1VOFS.write(y);
+        BG2HOFS.write(x);
+        BG2VOFS.write(y);
+        self.position = (x, y);
+        target == self.position
+    }
+
+    fn relative_sprite_location(&self, position: Position) -> Option<(u16, u16)> {
+        let target = (position.x as u16 * 8 + 52, position.y as u16 * 4 + 42);
+        let top_left = Self::position_to_pixel_location(position);
+
+        let x = {
+            let (x, overflow) = target
+                .0
+                .overflowing_add_signed(top_left.0 as i16 - self.position.0 as i16);
+            if overflow && x.wrapping_add(32) > 512 {
+                return None;
+            }
+            x
+        };
+        let y = {
+            let (y, overflow) = target
+                .1
+                .overflowing_add_signed(top_left.1 as i16 - self.position.1 as i16);
+            if overflow && y.wrapping_add(32) > 256 {
+                return None;
+            }
+            y
+        };
+
+        Some((x, y))
+    }
+}
+
+#[derive(Debug)]
 pub struct Game {
     cursor: Position,
     prev_keys: KeyInput,
 
     state: game::Game,
     player_color: game::Color,
+
+    scroll_accelerator: ScrollAccelerator,
 }
 
 impl Game {
@@ -282,6 +353,8 @@ impl Game {
 
             state: game,
             player_color,
+
+            scroll_accelerator: ScrollAccelerator::new(cursor),
         };
 
         // Draw the initial game state.
@@ -460,21 +533,28 @@ impl Game {
             VBlankIntrWait();
 
             // Draw the cursor.
-            let mut obj = ObjAttr::new();
-            obj.set_x(self.cursor.x as u16 * 8 + 52);
-            obj.set_y(self.cursor.y as u16 * 4 + 42);
-            obj.set_tile_id(0);
-            obj.set_palbank(0);
-            obj.1 = obj.1.with_size(1);
-            OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+            if let Some(obj_pixel_pos) = self
+                .scroll_accelerator
+                .relative_sprite_location(self.cursor)
+            {
+                let mut obj = ObjAttr::new();
+                obj.set_x(obj_pixel_pos.0);
+                obj.set_y(obj_pixel_pos.1);
+                obj.set_tile_id(0);
+                obj.set_palbank(0);
+                obj.1 = obj.1.with_size(1);
+                OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+            }
 
             if state_changed {
                 self.draw();
             }
 
             // Scroll.
-            scroll_screen_to_position(self.cursor);
+            self.scroll_accelerator.scroll_to_position(self.cursor);
         } else {
+            // // Hide cursor.
+            // OBJ_ATTR0.get(0).unwrap().write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed));
             'outer: for x in 0..16 {
                 for y in 0..16 {
                     if self
@@ -485,7 +565,31 @@ impl Game {
                         .is_ok()
                     {
                         VBlankIntrWait();
-                        scroll_screen_to_position(Position { x, y });
+                        loop {
+                            VBlankIntrWait();
+                            let completed = self
+                                .scroll_accelerator
+                                .scroll_to_position(Position { x, y });
+
+                            if let Some(obj_pixel_pos) = self
+                                .scroll_accelerator
+                                .relative_sprite_location(self.cursor)
+                            {
+                                let mut obj = ObjAttr::new();
+                                obj.set_x(obj_pixel_pos.0);
+                                obj.set_y(obj_pixel_pos.1);
+                                obj.set_tile_id(0);
+                                obj.set_palbank(0);
+                                obj.1 = obj.1.with_size(1);
+                                OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+                            }
+
+                            if completed {
+                                break;
+                            }
+                        }
+
+                        VBlankIntrWait();
                         self.draw();
                         wait_frames(60);
                         break 'outer;
