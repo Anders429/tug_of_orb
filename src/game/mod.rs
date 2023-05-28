@@ -97,6 +97,15 @@ impl Game {
         }
     }
 
+    pub fn is_eliminated(&self, color: Color) -> bool {
+        match color {
+            Color::Red => self.color_counts.red.is_none(),
+            Color::Blue => self.color_counts.blue.is_none(),
+            Color::Yellow => self.color_counts.yellow.is_none(),
+            Color::Green => self.color_counts.green.is_none(),
+        }
+    }
+
     /// Fill in the current color beginning at the given position.
     fn fill(&mut self, position: Position, first: bool) {
         // Ensure this is a valid position.

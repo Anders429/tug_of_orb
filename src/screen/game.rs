@@ -539,6 +539,24 @@ impl Game {
     }
 
     pub fn run(&mut self) -> Option<Screen> {
+        if self.state.is_eliminated(self.player_color) {
+            VBlankIntrWait();
+
+            // Fade out.
+            VBlankIntrWait();
+            for fade in (0..31) {
+                VBlankIntrWait();
+                BLDY.write(fade / 2);
+            }
+
+            // Reset scroll.
+            BG1HOFS.write(0);
+            BG1VOFS.write(0);
+            BG2HOFS.write(0);
+            BG2VOFS.write(0);
+
+            return Some(Screen::Title(super::Title::new()));
+        }
         if self.state.turn_color() == self.player_color {
             // Read keys for each frame.
             let keys = KEYINPUT.read();
