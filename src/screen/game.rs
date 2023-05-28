@@ -211,6 +211,7 @@ impl Game {
                 .with_target1_bg2(true)
                 .with_target1_bg3(true)
                 .with_target1_obj(true)
+                .with_target1_backdrop(true)
                 .with_mode(ColorEffectMode::Brighten),
         );
         // Fade out while we set up the screen.
@@ -294,6 +295,7 @@ impl Game {
         }
 
         // Define the game tiles.
+        load_tiles!("../../res/empty.4bpp", 0);
         load_tiles!("../../res/wall.4bpp", 1);
         load_tiles!("../../res/arrow_right.4bpp", 5);
         load_tiles!("../../res/arrow_left.4bpp", 9);
