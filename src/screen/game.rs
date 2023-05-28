@@ -168,7 +168,7 @@ impl ScrollAccelerator {
             let (x, overflow) = target
                 .0
                 .overflowing_add_signed(top_left.0 as i16 - self.position.0 as i16);
-            if overflow && x.wrapping_add(32) > 512 {
+            if x.wrapping_add(32) > 512 {
                 return None;
             }
             x
@@ -177,7 +177,7 @@ impl ScrollAccelerator {
             let (y, overflow) = target
                 .1
                 .overflowing_add_signed(top_left.1 as i16 - self.position.1 as i16);
-            if overflow && y.wrapping_add(32) > 256 {
+            if y.wrapping_add(32) > 256 {
                 return None;
             }
             y
