@@ -102,25 +102,31 @@ impl Game {
     }
 
     /// Fill in the current color beginning at the given position.
-    fn fill(&mut self, position: Position, first: bool) {
+    fn fill(&mut self, position: Position, visited: &mut [[bool; 16]; 16]) {
         // Ensure this is a valid position.
         let node = match self.grid.get_mut(position) {
             Some(node) => node,
             None => return,
         };
-        let old_color = node.color();
-        if !first && !node.set_color(self.turn_color) {
-            // Stop if the color was not changed; that means we have already been this direction
-            // before.
+
+        if visited[position.y as usize][position.x as usize] {
+            // We have already visited this position.
             return;
         }
-        self.color_counts.change(self.turn_color, old_color);
+        visited[position.y as usize][position.x as usize] = true;
+        let old_color = node.color();
+        if node.set_color(self.turn_color) {
+            self.color_counts.change(self.turn_color, old_color);
+        } else if !node.is_color(self.turn_color) {
+            // This means it's a wall.
+            return;
+        }
 
         // Deal with the node this node points to.
         if !node.is_hidden() {
             if let Some(direction) = node.direction() {
                 if let Some(new_position) = position.r#move(direction) {
-                    self.fill(new_position, false);
+                    self.fill(new_position, visited);
                 }
             } else if node.all_directions() {
                 for direction in [
@@ -130,7 +136,7 @@ impl Game {
                     Direction::Down,
                 ] {
                     if let Some(new_position) = position.r#move(direction) {
-                        self.fill(new_position, false);
+                        self.fill(new_position, visited);
                     }
                 }
             }
@@ -149,7 +155,7 @@ impl Game {
                         if new_node.direction() == Some(direction.opposite())
                             || new_node.all_directions()
                         {
-                            self.fill(new_position, false);
+                            self.fill(new_position, visited);
                         }
                     }
                 }
@@ -221,7 +227,21 @@ impl Game {
         }
 
         node.rotate();
-        self.fill(turn.rotate, true);
+
+        if let Node::SuperArrow { direction, .. } = node {
+            let direction = *direction;
+            let mut position = turn.rotate;
+            while let Some(new_pos) = position.r#move(direction) {
+                let node = self.grid.get_mut(new_pos).unwrap();
+                if node.is_wall() {
+                    break;
+                }
+                node.set_direction(direction);
+                position = new_pos;
+            }
+        }
+
+        self.fill(turn.rotate, &mut [[false; 16]; 16]);
 
         self.increment_turn();
 

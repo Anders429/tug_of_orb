@@ -165,7 +165,6 @@ impl Title {
         {
             let x = index % 12;
             let y = index / 12;
-            log::info!("{}, {}", x, y);
             TEXT_SCREENBLOCKS
                 .get_frame(16)
                 .unwrap()

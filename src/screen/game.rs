@@ -319,6 +319,10 @@ impl Game {
         load_tiles!("../../res/grid3_right_down.4bpp", 36);
         load_tiles!("../../res/background.4bpp", 37);
         load_tiles!("../../res/arrow_all.4bpp", 38);
+        load_tiles!("../../res/super_arrow_left.4bpp", 42);
+        load_tiles!("../../res/super_arrow_up.4bpp", 46);
+        load_tiles!("../../res/super_arrow_right.4bpp", 50);
+        load_tiles!("../../res/super_arrow_down.4bpp", 54);
 
         // Define the cursor tiles.
         let aligned_bytes = Align4(*include_bytes!("../../res/cursor.4bpp"));
@@ -334,6 +338,30 @@ impl Game {
         for y in 0..16 {
             for x in 0..16 {
                 set_tile(x, y, 37, 8, 1);
+            }
+        }
+
+        // Clear BGs.
+        for frame in 0..4 {
+            for y in 0..20 {
+                for x in 0..30 {
+                    TEXT_SCREENBLOCKS
+                        .get_frame(16 + frame)
+                        .unwrap()
+                        .get_row(y)
+                        .unwrap()
+                        .get(x)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0).with_palbank(1));
+                    TEXT_SCREENBLOCKS
+                        .get_frame(24 + frame)
+                        .unwrap()
+                        .get_row(y)
+                        .unwrap()
+                        .get(x)
+                        .unwrap()
+                        .write(TextEntry::new().with_tile(0).with_palbank(0));
+                }
             }
         }
 
@@ -497,6 +525,37 @@ impl Game {
                         };
                         if alignment.is_some() {
                             set_tile_group(x, y, 38, frame, palette);
+                        } else {
+                            set_tile_group(x, y, 1, frame, palette);
+                        }
+                        palette
+                    }
+                    Node::SuperArrow {
+                        alignment,
+                        direction,
+                    } => {
+                        let palette = match alignment {
+                            Some(game::Color::Red) => 1,
+                            Some(game::Color::Blue) => 2,
+                            Some(game::Color::Yellow) => 3,
+                            Some(game::Color::Green) => 4,
+                            _ => 0,
+                        };
+                        if alignment.is_some() {
+                            match direction {
+                                Direction::Left => {
+                                    set_tile_group(x, y, 42, frame, palette);
+                                }
+                                Direction::Right => {
+                                    set_tile_group(x, y, 50, frame, palette);
+                                }
+                                Direction::Down => {
+                                    set_tile_group(x, y, 54, frame, palette);
+                                }
+                                Direction::Up => {
+                                    set_tile_group(x, y, 46, frame, palette);
+                                }
+                            }
                         } else {
                             set_tile_group(x, y, 1, frame, palette);
                         }

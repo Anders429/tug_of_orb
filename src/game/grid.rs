@@ -34,6 +34,21 @@ impl Grid {
         lcg.jump_state(1);
         match rand {
             0..=63 => self.0[y][x] = Node::AllDirection { alignment: None },
+            64..=127 => {
+                self.0[y][x] = Node::SuperArrow {
+                    alignment: None,
+                    direction: {
+                        let rand = lcg.next_u8();
+                        lcg.jump_state(1);
+                        match rand {
+                            0..=63 => Direction::Left,
+                            64..=127 => Direction::Up,
+                            128..=191 => Direction::Right,
+                            192..=255 => Direction::Down,
+                        }
+                    },
+                }
+            }
             64..=255 => self.0[y][x] = Node::Wall,
         }
     }
