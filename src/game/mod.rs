@@ -246,6 +246,10 @@ impl Game {
     pub fn turn_color(&self) -> Color {
         self.turn_color
     }
+
+    pub fn weight(&self, position: Position) -> u8 {
+        self.grid.weight(position, &mut [[false; 16]; 16])
+    }
 }
 
 /// Helper for building game state.

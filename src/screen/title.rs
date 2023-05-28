@@ -69,7 +69,6 @@ impl Title {
         {
             let x = index % 30;
             let y = index / 30;
-            log::info!("{}, {}", x, y);
             TEXT_SCREENBLOCKS
                 .get_frame(8)
                 .unwrap()

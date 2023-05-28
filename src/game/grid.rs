@@ -149,4 +149,43 @@ impl Grid {
     pub fn iter(&self) -> slice::Iter<[Node; 16]> {
         self.0.iter()
     }
+
+    pub fn weight(&self, position: Position, visited: &mut [[bool; 16]; 16]) -> u8 {
+        log::info!("position: {:?}", position);
+        if visited[position.y as usize][position.x as usize] {
+            0
+        } else {
+            visited[position.y as usize][position.x as usize] = true;
+            if let Some(node) = self.get(position) {
+                if node.is_hidden() {
+                    0
+                } else {
+                    if let Some(direction) = node.direction() {
+                        if let Some(new_position) = position.r#move(direction) {
+                            1 + self.weight(new_position, visited)
+                        } else {
+                            1
+                        }
+                    } else if node.all_directions() {
+                        let mut weight = 1;
+                        for direction in [
+                            Direction::Left,
+                            Direction::Up,
+                            Direction::Right,
+                            Direction::Down,
+                        ] {
+                            if let Some(new_position) = position.r#move(direction) {
+                                weight += self.weight(new_position, visited);
+                            }
+                        }
+                        weight
+                    } else {
+                        0
+                    }
+                }
+            } else {
+                0
+            }
+        }
+    }
 }

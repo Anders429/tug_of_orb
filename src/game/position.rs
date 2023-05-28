@@ -20,11 +20,11 @@ impl Position {
                 x: self.x,
                 y: self.y - 1,
             }),
-            Direction::Right => (self.x < u8::MAX).then(|| Position {
+            Direction::Right => (self.x < 15).then(|| Position {
                 x: self.x + 1,
                 y: self.y,
             }),
-            Direction::Down => (self.y < u8::MAX).then(|| Position {
+            Direction::Down => (self.y < 15).then(|| Position {
                 x: self.x,
                 y: self.y + 1,
             }),

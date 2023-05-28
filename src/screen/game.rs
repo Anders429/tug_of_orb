@@ -637,47 +637,91 @@ impl Game {
                 self.draw();
             }
         } else {
-            'outer: for x in 0..16 {
+            // Determine the best move.
+            let mut best_position = None;
+            let mut best_weight = None;
+            for x in 0..16 {
                 for y in 0..16 {
-                    if self
-                        .state
-                        .execute_turn(Turn {
-                            rotate: Position { x, y },
-                        })
-                        .is_ok()
-                    {
-                        VBlankIntrWait();
-                        loop {
-                            VBlankIntrWait();
-                            let completed = self
-                                .scroll_accelerator
-                                .scroll_to_position(Position { x, y }, 2);
-
-                            if let Some(obj_pixel_pos) = self
-                                .scroll_accelerator
-                                .relative_sprite_location(self.cursor)
-                            {
-                                let mut obj = ObjAttr::new();
-                                obj.set_x(obj_pixel_pos.0);
-                                obj.set_y(obj_pixel_pos.1);
-                                obj.set_tile_id(0);
-                                obj.set_palbank(0);
-                                obj.1 = obj.1.with_size(1);
-                                OBJ_ATTR_ALL.get(0).unwrap().write(obj);
-                            }
-
-                            if completed {
-                                break;
+                    let node = self.state.grid().get(Position { x, y }).unwrap();
+                    if node.is_color(self.state.turn_color()) {
+                        if let Some(direction) = node.direction() {
+                            if let Some(best_weight_inner) = best_weight {
+                                if let Some(new_pos) =
+                                    (Position { x, y }).r#move(direction.clockwise())
+                                {
+                                    if !self
+                                        .state
+                                        .grid()
+                                        .get(new_pos)
+                                        .unwrap()
+                                        .is_color(self.state.turn_color())
+                                    {
+                                        let weight = self.state.weight(new_pos);
+                                        if weight > best_weight_inner {
+                                            best_weight = Some(weight);
+                                            best_position = Some((x, y));
+                                        }
+                                    }
+                                }
+                            } else {
+                                if let Some(new_pos) =
+                                    (Position { x, y }).r#move(direction.clockwise())
+                                {
+                                    if !self
+                                        .state
+                                        .grid()
+                                        .get(new_pos)
+                                        .unwrap()
+                                        .is_color(self.state.turn_color())
+                                    {
+                                        best_weight = Some(self.state.weight(new_pos));
+                                    } else {
+                                        best_weight = Some(0);
+                                    }
+                                } else {
+                                    best_weight = Some(0);
+                                }
+                                best_position = Some((x, y));
                             }
                         }
-
-                        VBlankIntrWait();
-                        self.draw();
-                        wait_frames(30);
-                        break 'outer;
                     }
                 }
             }
+
+            let (x, y) = best_position.unwrap();
+            self.state
+                .execute_turn(Turn {
+                    rotate: Position { x, y },
+                })
+                .unwrap();
+            VBlankIntrWait();
+            loop {
+                VBlankIntrWait();
+                let completed = self
+                    .scroll_accelerator
+                    .scroll_to_position(Position { x, y }, 2);
+
+                if let Some(obj_pixel_pos) = self
+                    .scroll_accelerator
+                    .relative_sprite_location(self.cursor)
+                {
+                    let mut obj = ObjAttr::new();
+                    obj.set_x(obj_pixel_pos.0);
+                    obj.set_y(obj_pixel_pos.1);
+                    obj.set_tile_id(0);
+                    obj.set_palbank(0);
+                    obj.1 = obj.1.with_size(1);
+                    OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+                }
+
+                if completed {
+                    break;
+                }
+            }
+
+            VBlankIntrWait();
+            self.draw();
+            wait_frames(30);
             self.scroll_at_start_of_player_turn = true;
         }
 
