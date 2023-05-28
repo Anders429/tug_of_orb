@@ -1,4 +1,4 @@
-use super::{Game, Screen};
+use super::{Screen, Title};
 use crate::{
     game,
     game::{Color, Grid, Position},
@@ -16,11 +16,11 @@ use gba::{
     Align4,
 };
 
-pub struct Title {
-    random_seed: u32,
+pub struct Splash {
+    frame_count: u16,
 }
 
-impl Title {
+impl Splash {
     pub fn new() -> Self {
         // Initialize fade.
         BLDCNT.write(
@@ -69,7 +69,6 @@ impl Title {
         {
             let x = index % 30;
             let y = index / 30;
-            log::info!("{}, {}", x, y);
             TEXT_SCREENBLOCKS
                 .get_frame(8)
                 .unwrap()
@@ -86,12 +85,14 @@ impl Title {
             BLDY.write(fade / 2);
         }
 
-        Self { random_seed: 0 }
+        Self { frame_count: 0 }
     }
 
     pub fn run(&mut self) -> Option<Screen> {
         let keys = KEYINPUT.read();
-        if keys.a() {
+        if self.frame_count > 180 || keys.a() {
+            VBlankIntrWait();
+
             // Fade out.
             VBlankIntrWait();
             for fade in (0..31) {
@@ -99,17 +100,12 @@ impl Title {
                 BLDY.write(fade / 2);
             }
 
-            return Some(Screen::Game(Game::new(
-                Position { x: 0, y: 0 },
-                game::Game::builder()
-                    .grid(Grid::generate(self.random_seed))
-                    .build(),
-                Color::Red,
-            )));
+            Some(Screen::Title(Title::new()))
+        } else {
+            let keys = KEYINPUT.read();
+            VBlankIntrWait();
+            self.frame_count += 1;
+            None
         }
-
-        self.random_seed += 1;
-
-        None
     }
 }
