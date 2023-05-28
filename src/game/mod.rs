@@ -71,11 +71,6 @@ impl ColorCounts {
     }
 }
 
-pub enum Conclusion {
-    Undecided,
-    Winner(Color),
-}
-
 /// The game state.
 #[derive(Debug)]
 pub struct Game {
@@ -216,7 +211,7 @@ impl Game {
     }
 
     /// Execute turn for the current player.
-    pub fn execute_turn(&mut self, turn: Turn) -> Result<Conclusion, turn::Error> {
+    pub fn execute_turn(&mut self, turn: Turn) -> Result<Option<Color>, turn::Error> {
         let node = self
             .grid
             .get_mut(turn.rotate)
@@ -230,13 +225,18 @@ impl Game {
 
         self.increment_turn();
 
-        log::info!(
-            "turn_color: {:?}, counts: {:?}",
-            self.turn_color,
-            self.color_counts
-        );
-
-        Ok(Conclusion::Undecided)
+        match (
+            self.color_counts.red.is_some(),
+            self.color_counts.blue.is_some(),
+            self.color_counts.yellow.is_some(),
+            self.color_counts.green.is_some(),
+        ) {
+            (true, false, false, false) => Ok(Some(Color::Red)),
+            (false, true, false, false) => Ok(Some(Color::Blue)),
+            (false, false, true, false) => Ok(Some(Color::Yellow)),
+            (false, false, false, true) => Ok(Some(Color::Green)),
+            _ => Ok(None),
+        }
     }
 
     pub fn grid(&self) -> &Grid {

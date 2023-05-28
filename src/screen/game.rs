@@ -579,14 +579,31 @@ impl Game {
                 self.cursor = self.cursor.move_saturating(Direction::Down, MAX_POSITION);
             }
             if keys.a() && !self.prev_keys.a() {
-                if self
-                    .state
-                    .execute_turn(Turn {
-                        rotate: self.cursor,
-                    })
-                    .is_ok()
-                {
+                let result = self.state.execute_turn(Turn {
+                    rotate: self.cursor,
+                });
+                if let Ok(winner) = result {
                     state_changed = true;
+                    if winner.is_some() {
+                        VBlankIntrWait();
+
+                        self.draw();
+
+                        // Fade out.
+                        VBlankIntrWait();
+                        for fade in (0..31) {
+                            VBlankIntrWait();
+                            BLDY.write(fade / 2);
+                        }
+
+                        // Reset scroll.
+                        BG1HOFS.write(0);
+                        BG1VOFS.write(0);
+                        BG2HOFS.write(0);
+                        BG2VOFS.write(0);
+
+                        return Some(Screen::Title(super::Title::new()));
+                    }
                 }
             }
 
