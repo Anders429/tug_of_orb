@@ -139,9 +139,17 @@ impl ScrollAccelerator {
     fn scroll_to_position(&mut self, position: Position, velocity: u16) -> bool {
         let target = Self::position_to_pixel_location(position);
         let x = if (self.position.0 > target.0) {
-            self.position.0 - velocity
+            if self.position.0 - target.0 >= velocity {
+                self.position.0 - velocity
+            } else {
+                self.position.0 - 1
+            }
         } else if (self.position.0 < target.0) {
-            self.position.0 + velocity
+            if target.0 - self.position.0 >= velocity {
+                self.position.0 + velocity
+            } else {
+                self.position.0 + 1
+            }
         } else {
             self.position.0
         };
@@ -599,22 +607,9 @@ impl Game {
 
     pub fn run(&mut self) -> Option<Screen> {
         if self.state.is_eliminated(self.player_color) {
-            VBlankIntrWait();
-
-            // Fade out.
-            VBlankIntrWait();
-            for fade in (0..31) {
-                VBlankIntrWait();
-                BLDY.write(fade / 2);
-            }
-
-            // Reset scroll.
-            BG1HOFS.write(0);
-            BG1VOFS.write(0);
-            BG2HOFS.write(0);
-            BG2VOFS.write(0);
-
-            return Some(Screen::Title(super::Title::new()));
+            return Some(Screen::GameOver(super::GameOver::new(
+                super::game_over::PlayerResult::Lose,
+            )));
         }
         if self.state.turn_color() == self.player_color {
             // Read keys for each frame.
@@ -648,20 +643,9 @@ impl Game {
 
                         self.draw();
 
-                        // Fade out.
-                        VBlankIntrWait();
-                        for fade in (0..31) {
-                            VBlankIntrWait();
-                            BLDY.write(fade / 2);
-                        }
-
-                        // Reset scroll.
-                        BG1HOFS.write(0);
-                        BG1VOFS.write(0);
-                        BG2HOFS.write(0);
-                        BG2VOFS.write(0);
-
-                        return Some(Screen::Title(super::Title::new()));
+                        return Some(Screen::GameOver(super::GameOver::new(
+                            super::game_over::PlayerResult::Win,
+                        )));
                     }
                 }
             }

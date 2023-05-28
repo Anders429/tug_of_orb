@@ -1,8 +1,10 @@
 mod game;
+mod game_over;
 mod splash;
 mod title;
 
 pub use game::Game;
+pub use game_over::GameOver;
 pub use splash::Splash;
 pub use title::Title;
 
@@ -10,6 +12,7 @@ pub enum Screen {
     Splash(Splash),
     Title(Title),
     Game(Game),
+    GameOver(GameOver),
 }
 
 impl Screen {
@@ -19,6 +22,7 @@ impl Screen {
             Self::Splash(splash) => splash.run(),
             Self::Title(title) => title.run(),
             Self::Game(game) => game.run(),
+            Self::GameOver(game_over) => game_over.run(),
         } {
             *self = new_screen;
         }
