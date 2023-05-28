@@ -71,6 +71,14 @@ impl Title {
         {
             bg_palbank(1).index(index).write(gba::video::Color(*bytes));
         }
+        // Load press a palette.
+        for (index, bytes) in Align4(*include_bytes!("../../res/press_a.pal"))
+            .as_u16_slice()
+            .iter()
+            .enumerate()
+        {
+            bg_palbank(2).index(index).write(gba::video::Color(*bytes));
+        }
 
         // Load tiles.
         let aligned_bytes = Align4(*include_bytes!("../../res/title.4bpp"));
@@ -98,6 +106,15 @@ impl Title {
         CHARBLOCK0_4BPP
             .as_region()
             .sub_slice(76..76 + len)
+            .write_from_slice(&tiles[0..len]);
+
+        let aligned_bytes = Align4(*include_bytes!("../../res/press_a.4bpp"));
+        let bytes = aligned_bytes.as_u32_slice();
+        let len = bytes.len() / 8;
+        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
+        CHARBLOCK0_4BPP
+            .as_region()
+            .sub_slice(77..77 + len)
             .write_from_slice(&tiles[0..len]);
 
         // Draw white background.
@@ -133,11 +150,30 @@ impl Title {
             TEXT_SCREENBLOCKS
                 .get_frame(16)
                 .unwrap()
-                .get_row(y)
+                .get_row(y + 2)
                 .unwrap()
                 .get(x + 10)
                 .unwrap()
                 .write(TextEntry::new().with_tile(*tile));
+        }
+
+        // Draw the press a.
+        for (index, tile) in Align4(*include_bytes!("../../res/press_a.map"))
+            .as_u16_slice()
+            .iter()
+            .enumerate()
+        {
+            let x = index % 12;
+            let y = index / 12;
+            log::info!("{}, {}", x, y);
+            TEXT_SCREENBLOCKS
+                .get_frame(16)
+                .unwrap()
+                .get_row(y + 16)
+                .unwrap()
+                .get(x + 9)
+                .unwrap()
+                .write(TextEntry::new().with_tile(*tile).with_palbank(2));
         }
 
         // Fade in.
