@@ -40,7 +40,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 
 /// Entry point for the game.
 #[no_mangle]
-extern "C" fn main() -> ! {
+pub fn main() -> ! {
     // Initialize the global logger.
     //
     // This logging only works in mGBA. It is only enabled in debug builds.
