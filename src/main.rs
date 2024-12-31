@@ -10,13 +10,9 @@ use gba::{
     mmio::{DISPSTAT, IE, IME},
     video::DisplayStatus,
 };
-use screen::Screen;
 #[cfg(debug_assertions)]
-use ::{
-    core::fmt::Write,
-    log::error,
-    mgba_log::{MgbaLogLevel, MgbaWriter},
-};
+use log::error;
+use screen::Screen;
 
 /// This panic handler is specifically for debug mode.
 ///
@@ -28,8 +24,7 @@ use ::{
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     error!("{}", info);
-    MgbaWriter::new(MgbaLogLevel::Fatal)
-        .write_str("Halting due to panic. See logs for `PanicInfo`.");
+    mgba_log::fatal!("Halting due to panic. See logs for `PanicInfo`.");
     loop {}
 }
 
@@ -50,7 +45,7 @@ extern "C" fn main() -> ! {
     //
     // This logging only works in mGBA. It is only enabled in debug builds.
     #[cfg(debug_assertions)]
-    mgba_log::init().expect("failed to initialize mgba logging");
+    let _ = mgba_log::init();
 
     // Enable vblank interrupts.
     DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
@@ -64,3 +59,6 @@ extern "C" fn main() -> ! {
         screen.run();
     }
 }
+
+#[no_mangle]
+pub fn __sync_synchronize() {}

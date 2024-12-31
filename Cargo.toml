@@ -5,14 +5,13 @@ edition = "2021"
 
 [profile.dev]
 panic = "abort"
-# Causes miscompilation when counting colors in grid. Idk what that's about.
-# opt-level = 3
+opt-level = 3
 
 [profile.release]
 panic = "abort"
 lto = true
 
 [dependencies]
-gba = "0.11.1"
+gba = "0.13.2"
 log = {version = "0.4.17", features = ["max_level_debug", "release_max_level_off"]}
-mgba_log = {path = "mgba_log"}
+mgba_log = "0.2.1"

@@ -1,8 +1,0 @@
-[package]
-name = "mgba_log"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-log = "0.4.17"
-voladdress = "1.2.2"
