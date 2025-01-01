@@ -10,7 +10,6 @@ use gba::{
     mmio::{DISPSTAT, IE, IME},
     video::DisplayStatus,
 };
-#[cfg(debug_assertions)]
 use log::error;
 use screen::Screen;
 
@@ -20,21 +19,10 @@ use screen::Screen;
 /// log will occur to halt emulation and display an error to the user. This is done to ensure the
 /// entirety of the panic info is displayed to the user, as mGBA only allows for up to 256 bytes to
 /// be logged at once.
-#[cfg(debug_assertions)]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     error!("{}", info);
     mgba_log::fatal!("Halting due to panic. See logs for `PanicInfo`.");
-    loop {}
-}
-
-/// This panic handler is specifically for release mode.
-///
-/// In release builds, panicking just causes the game to lock up. Ideally, panicking should not
-/// occur at all in release builds.
-#[cfg(not(debug_assertions))]
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
 
