@@ -48,12 +48,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "nocash_gba_log"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88686a64a0585348576e0b13174c7018318039e4ab1ee6ad454d833c0f601a80"
+dependencies = [
+ "log",
+]
+
+[[package]]
 name = "tug_of_orb"
 version = "0.1.0"
 dependencies = [
  "gba",
  "log",
  "mgba_log",
+ "nocash_gba_log",
 ]
 
 [[package]]

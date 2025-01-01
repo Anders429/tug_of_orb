@@ -13,6 +13,16 @@ use gba::{
 use log::error;
 use screen::Screen;
 
+/// Initialize logging in an emulator, if possible.
+///
+/// Note that we don't actually care if either of these loggers fails to initialize. We just want
+/// one of them initialized if at all possible to make debugging easier.
+pub fn init_log() {
+    if mgba_log::init().is_err() {
+        let _ = nocash_gba_log::init();
+    }
+}
+
 /// This panic handler is specifically for debug mode.
 ///
 /// When panicking in debug builds, the panic info is logged as an error. Following this, a fatal
@@ -33,7 +43,7 @@ pub fn main() -> ! {
     //
     // This logging only works in mGBA. It is only enabled in debug builds.
     #[cfg(debug_assertions)]
-    let _ = mgba_log::init();
+    init_log();
 
     // Enable vblank interrupts.
     DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
