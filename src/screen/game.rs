@@ -154,9 +154,17 @@ impl ScrollAccelerator {
             self.position.0
         };
         let y = if (self.position.1 > target.1) {
-            self.position.1 - velocity
+            if self.position.1 - target.1 >= velocity {
+                self.position.1 - velocity
+            } else {
+                self.position.1 - 1
+            }
         } else if (self.position.1 < target.1) {
-            self.position.1 + velocity
+            if target.1 - self.position.1 >= velocity {
+                self.position.1 + velocity
+            } else {
+                self.position.1 + 1
+            }
         } else {
             self.position.1
         };
