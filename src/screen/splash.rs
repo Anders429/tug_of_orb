@@ -1,20 +1,17 @@
 use super::{Screen, Title};
 use crate::{
-    game,
-    game::{Color, Grid, Position},
-};
-use core::slice;
-use gba::{
-    bios::VBlankIntrWait,
+    bios::wait_for_vblank,
+    include_bytes_aligned,
     mmio::{
-        bg_palbank, BG2CNT, BG_PALETTE, BLDCNT, BLDY, CHARBLOCK0_8BPP, CHARBLOCK1_8BPP,
-        CHARBLOCK2_8BPP, DISPCNT, KEYINPUT, TEXT_SCREENBLOCKS,
+        keys::KeyInput,
+        vram::{
+            BackgroundControl, BlendControl, Color, ColorEffect, DisplayControl, TextScreenEntry,
+        },
+        BG2CNT, BG_PALETTE, BLDCNT, BLDY, CHARBLOCK0, DISPCNT, KEYINPUT, TEXT_SCREENBLOCK8,
     },
-    video::{
-        BackgroundControl, BlendControl, ColorEffectMode, DisplayControl, TextEntry, VideoMode,
-    },
-    Align4,
 };
+use core::mem::transmute;
+use deranged::RangedU8;
 
 pub struct Splash {
     frame_count: u16,
@@ -22,88 +19,88 @@ pub struct Splash {
 
 impl Splash {
     pub fn new() -> Self {
-        // Initialize fade.
-        BLDCNT.write(
-            BlendControl::new()
-                .with_target1_bg0(true)
-                .with_target1_bg1(true)
-                .with_target1_bg2(true)
-                .with_target1_bg3(true)
-                .with_target1_obj(true)
-                .with_target1_backdrop(true)
-                .with_mode(ColorEffectMode::Brighten),
-        );
-        // Fade out while we set up the screen.
-        BLDY.write(16);
+        unsafe {
+            // Initialize fade.
+            BLDCNT.write_volatile(
+                BlendControl::new()
+                    .with_target1_bg0(true)
+                    .with_target1_bg1(true)
+                    .with_target1_bg2(true)
+                    .with_target1_bg3(true)
+                    .with_target1_obj(true)
+                    .with_target1_backdrop(true)
+                    .with_color_effect(ColorEffect::Brighten),
+            );
+            // Fade out while we set up the screen.
+            BLDY.write_volatile(RangedU8::new_static::<16>());
 
-        BG2CNT.write(BackgroundControl::new().with_screenblock(8).with_bpp8(true));
-        DISPCNT.write(DisplayControl::new().with_show_bg2(true));
+            BG2CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<8>())
+                    .with_8bpp(true),
+            );
+            DISPCNT.write_volatile(DisplayControl::new().with_bg2(true));
 
-        // Load palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/splash_jam.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            BG_PALETTE
-                .get(index)
-                .unwrap()
-                .write(gba::video::Color(*bytes));
+            // Load palette.
+            BG_PALETTE.cast::<[Color; 256]>().write_volatile(transmute(
+                include_bytes_aligned!("../../res/splash_jam.pal").0,
+            ));
         }
 
         // Load tiles.
-        let aligned_bytes = Align4(*include_bytes!("../../res/splash_jam.8bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 16;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 16], len) };
-        CHARBLOCK0_8BPP
-            .as_region()
-            .sub_slice(0..len)
-            .write_from_slice(&tiles[0..len]);
+        unsafe {
+            CHARBLOCK0
+                .cast::<[[u32; 16]; 161]>()
+                .write_volatile(transmute(
+                    include_bytes_aligned!("../../res/splash_jam.8bpp").0,
+                ));
+        }
 
         // Draw the logo.
-        for (index, tile) in Align4(*include_bytes!("../../res/splash_jam.map"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
+        for (index, row) in unsafe {
+            transmute::<_, [[TextScreenEntry; 30]; 20]>(
+                include_bytes_aligned!("../../res/splash_jam.map").0,
+            )
+        }
+        .into_iter()
+        .enumerate()
         {
-            let x = index % 30;
-            let y = index / 30;
-            TEXT_SCREENBLOCKS
-                .get_frame(8)
-                .unwrap()
-                .get_row(y)
-                .unwrap()
-                .get(x)
-                .unwrap()
-                .write(TextEntry::new().with_tile(*tile));
+            unsafe {
+                TEXT_SCREENBLOCK8
+                    .add(32 * index)
+                    .cast::<[TextScreenEntry; 30]>()
+                    .write_volatile(row);
+            }
         }
 
         // Fade in.
         for fade in (0..31).rev() {
-            VBlankIntrWait();
-            BLDY.write(fade / 2);
+            wait_for_vblank();
+            unsafe {
+                BLDY.write_volatile(RangedU8::new_unchecked(fade / 2));
+            }
         }
 
         Self { frame_count: 0 }
     }
 
     pub fn run(&mut self) -> Option<Screen> {
-        let keys = KEYINPUT.read();
-        if self.frame_count > 180 || keys.a() {
-            VBlankIntrWait();
+        let keys = unsafe { KEYINPUT.read_volatile() };
+        if self.frame_count > 180 || keys.contains(KeyInput::A) {
+            wait_for_vblank();
 
             // Fade out.
-            VBlankIntrWait();
-            for fade in (0..31) {
-                VBlankIntrWait();
-                BLDY.write(fade / 2);
+            wait_for_vblank();
+            for fade in 0..31 {
+                wait_for_vblank();
+                unsafe {
+                    BLDY.write_volatile(RangedU8::new_unchecked(fade / 2));
+                }
             }
 
             Some(Screen::Title(Title::new()))
         } else {
-            let keys = KEYINPUT.read();
-            VBlankIntrWait();
+            wait_for_vblank();
             self.frame_count += 1;
             None
         }

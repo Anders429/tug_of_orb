@@ -1,20 +1,18 @@
 use super::{Game, Screen};
 use crate::{
+    bios::wait_for_vblank,
     game,
     game::{Color, Grid, Position},
-};
-use core::slice;
-use gba::{
-    bios::VBlankIntrWait,
+    include_bytes_aligned,
     mmio::{
-        bg_palbank, BG1CNT, BG2CNT, BG_PALETTE, BLDCNT, BLDY, CHARBLOCK0_4BPP, CHARBLOCK1_4BPP,
-        CHARBLOCK2_8BPP, DISPCNT, KEYINPUT, TEXT_SCREENBLOCKS,
+        keys::KeyInput,
+        vram::{BackgroundControl, BlendControl, ColorEffect, DisplayControl, TextScreenEntry},
+        BG1CNT, BG2CNT, BG_PALETTE, BLDCNT, BLDY, CHARBLOCK0, DISPCNT, KEYINPUT,
+        TEXT_SCREENBLOCK16, TEXT_SCREENBLOCK8,
     },
-    video::{
-        BackgroundControl, BlendControl, ColorEffectMode, DisplayControl, TextEntry, VideoMode,
-    },
-    Align4,
 };
+use core::mem::transmute;
+use deranged::{RangedU16, RangedU8};
 
 pub struct Title {
     random_seed: u32,
@@ -22,176 +20,135 @@ pub struct Title {
 
 impl Title {
     pub fn new() -> Self {
-        // Initialize fade.
-        BLDCNT.write(
-            BlendControl::new()
-                .with_target1_bg0(true)
-                .with_target1_bg1(true)
-                .with_target1_bg2(true)
-                .with_target1_bg3(true)
-                .with_target1_obj(true)
-                .with_target1_backdrop(true)
-                .with_mode(ColorEffectMode::Brighten),
-        );
-        // Fade out while we set up the screen.
-        BLDY.write(16);
+        unsafe {
+            // Initialize fade.
+            BLDCNT.write_volatile(
+                BlendControl::new()
+                    .with_target1_bg0(true)
+                    .with_target1_bg1(true)
+                    .with_target1_bg2(true)
+                    .with_target1_bg3(true)
+                    .with_target1_obj(true)
+                    .with_target1_backdrop(true)
+                    .with_color_effect(ColorEffect::Brighten),
+            );
+            // Fade out while we set up the screen.
+            BLDY.write_volatile(RangedU8::new_static::<16>());
 
-        BG1CNT.write(
-            BackgroundControl::new()
-                .with_screenblock(8)
-                .with_priority(1),
-        );
-        BG2CNT.write(
-            BackgroundControl::new()
-                .with_screenblock(16)
-                .with_priority(0),
-        );
-        DISPCNT.write(
-            DisplayControl::new()
-                .with_show_bg1(true)
-                .with_show_bg2(true),
-        );
+            BG1CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<8>())
+                    .with_priority(RangedU8::new_static::<1>()),
+            );
+            BG2CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<16>())
+                    .with_priority(RangedU8::new_static::<0>()),
+            );
+            DISPCNT.write_volatile(DisplayControl::new().with_bg1(true).with_bg2(true));
 
-        // Load palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/title.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(0)
-                .get(index)
-                .unwrap()
-                .write(gba::video::Color(*bytes));
-        }
-        // Load red palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/red.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(1).index(index).write(gba::video::Color(*bytes));
-        }
-        // Load press a palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/press_a.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(2).index(index).write(gba::video::Color(*bytes));
+            // Load palettes.
+            BG_PALETTE.write_volatile(transmute(include_bytes_aligned!("../../res/title.pal").0));
+            BG_PALETTE
+                .add(1)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/red.pal").0));
+            BG_PALETTE
+                .add(2)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/press_a.pal").0));
         }
 
         // Load tiles.
-        let aligned_bytes = Align4(*include_bytes!("../../res/title.4bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        CHARBLOCK0_4BPP
-            .as_region()
-            .sub_slice(0..len)
-            .write_from_slice(&tiles[0..len]);
-
-        let aligned_bytes = Align4(*include_bytes!("../../res/background.4bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        CHARBLOCK0_4BPP
-            .as_region()
-            .sub_slice(75..75 + len)
-            .write_from_slice(&tiles[0..len]);
-
-        let aligned_bytes = Align4(*include_bytes!("../../res/empty.4bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        CHARBLOCK0_4BPP
-            .as_region()
-            .sub_slice(76..76 + len)
-            .write_from_slice(&tiles[0..len]);
-
-        let aligned_bytes = Align4(*include_bytes!("../../res/press_a.4bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        CHARBLOCK0_4BPP
-            .as_region()
-            .sub_slice(77..77 + len)
-            .write_from_slice(&tiles[0..len]);
+        unsafe {
+            CHARBLOCK0
+                .cast::<[[u32; 8]; 75]>()
+                .write_volatile(transmute(include_bytes_aligned!("../../res/title.4bpp").0));
+            CHARBLOCK0.add(75).write_volatile(transmute(
+                include_bytes_aligned!("../../res/background.4bpp").0,
+            ));
+            CHARBLOCK0
+                .add(76)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/empty.4bpp").0));
+            CHARBLOCK0
+                .add(77)
+                .cast::<[[u32; 8]; 23]>()
+                .write_volatile(transmute(
+                    include_bytes_aligned!("../../res/press_a.4bpp").0,
+                ));
+        }
 
         // Draw white background.
-        for y in 0..20 {
-            for x in 0..30 {
-                TEXT_SCREENBLOCKS
-                    .get_frame(8)
-                    .unwrap()
-                    .get_row(y)
-                    .unwrap()
-                    .get(x)
-                    .unwrap()
-                    .write(TextEntry::new().with_tile(75).with_palbank(1));
-                TEXT_SCREENBLOCKS
-                    .get_frame(16)
-                    .unwrap()
-                    .get_row(y)
-                    .unwrap()
-                    .get(x)
-                    .unwrap()
-                    .write(TextEntry::new().with_tile(76).with_palbank(0));
+        let screenblock8_ptr = TEXT_SCREENBLOCK8.cast::<[TextScreenEntry; 30]>();
+        let screenblock16_ptr = TEXT_SCREENBLOCK16.cast::<[TextScreenEntry; 30]>();
+        for i in 0..20 {
+            unsafe {
+                screenblock8_ptr.byte_add(64 * i).write_volatile(
+                    [TextScreenEntry::new()
+                        .with_tile(RangedU16::new_static::<75>())
+                        .with_palette(RangedU8::new_static::<1>()); 30],
+                );
+                screenblock16_ptr.byte_add(64 * i).write_volatile(
+                    [TextScreenEntry::new()
+                        .with_tile(RangedU16::new_static::<76>())
+                        .with_palette(RangedU8::new_static::<0>()); 30],
+                );
             }
         }
 
         // Draw the logo.
-        for (index, tile) in Align4(*include_bytes!("../../res/title.map"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
+        for (index, row) in unsafe {
+            transmute::<_, [[TextScreenEntry; 10]; 10]>(
+                include_bytes_aligned!("../../res/title.map").0,
+            )
+        }
+        .into_iter()
+        .enumerate()
         {
-            let x = index % 10;
-            let y = index / 10;
-            TEXT_SCREENBLOCKS
-                .get_frame(16)
-                .unwrap()
-                .get_row(y + 2)
-                .unwrap()
-                .get(x + 10)
-                .unwrap()
-                .write(TextEntry::new().with_tile(*tile));
+            unsafe {
+                TEXT_SCREENBLOCK16
+                    .add((index + 2) * 32 + 10)
+                    .cast::<[TextScreenEntry; 10]>()
+                    .write_volatile(row);
+            }
         }
 
         // Draw the press a.
-        for (index, tile) in Align4(*include_bytes!("../../res/press_a.map"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
+        for (index, row) in unsafe {
+            transmute::<_, [[TextScreenEntry; 12]; 2]>(
+                include_bytes_aligned!("../../res/press_a.map").0,
+            )
+        }
+        .into_iter()
+        .enumerate()
         {
-            let x = index % 12;
-            let y = index / 12;
-            TEXT_SCREENBLOCKS
-                .get_frame(16)
-                .unwrap()
-                .get_row(y + 16)
-                .unwrap()
-                .get(x + 9)
-                .unwrap()
-                .write(TextEntry::new().with_tile(*tile).with_palbank(2));
+            unsafe {
+                TEXT_SCREENBLOCK16
+                    .add((index + 16) * 32 + 10)
+                    .cast::<[TextScreenEntry; 12]>()
+                    .write_volatile(row);
+            }
         }
 
         // Fade in.
         for fade in (0..31).rev() {
-            VBlankIntrWait();
-            BLDY.write(fade / 2);
+            wait_for_vblank();
+            unsafe {
+                BLDY.write_volatile(RangedU8::new_unchecked(fade / 2));
+            }
         }
 
         Self { random_seed: 0 }
     }
 
     pub fn run(&mut self) -> Option<Screen> {
-        let keys = KEYINPUT.read();
-        if keys.a() {
+        let keys = unsafe { KEYINPUT.read_volatile() };
+        if keys.contains(KeyInput::A) {
             // Fade out.
-            VBlankIntrWait();
-            for fade in (0..31) {
-                VBlankIntrWait();
-                BLDY.write(fade / 2);
+            wait_for_vblank();
+            for fade in 0..31 {
+                wait_for_vblank();
+                unsafe {
+                    BLDY.write_volatile(RangedU8::new_unchecked(fade / 2));
+                }
             }
 
             return Some(Screen::Game(Game::new(

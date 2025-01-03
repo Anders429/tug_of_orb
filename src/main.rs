@@ -1,16 +1,19 @@
 #![no_std]
 #![no_main]
+#![cfg_attr(test, feature(custom_test_frameworks))]
+#![cfg_attr(test, test_runner(gba_test::runner))]
+#![cfg_attr(test, reexport_test_harness_main = "test_harness")]
 
+mod align;
+mod bios;
 mod game;
+mod mmio;
+#[cfg(not(test))]
+mod runtime;
 mod screen;
 
-use game::{Color, Direction, Game, Grid, Node, Position};
-use gba::{
-    interrupts::IrqBits,
-    mmio::{DISPSTAT, IE, IME},
-    video::DisplayStatus,
-};
 use log::error;
+use mmio::{interrupts::Interrupts, vram::DisplayStatus, DISPSTAT, IE, IME};
 use screen::Screen;
 
 /// Initialize logging in an emulator, if possible.
@@ -29,6 +32,7 @@ pub fn init_log() {
 /// log will occur to halt emulation and display an error to the user. This is done to ensure the
 /// entirety of the panic info is displayed to the user, as mGBA only allows for up to 256 bytes to
 /// be logged at once.
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo) -> ! {
     error!("{}", info);
@@ -37,6 +41,7 @@ fn panic(info: &core::panic::PanicInfo) -> ! {
 }
 
 /// Entry point for the game.
+#[cfg(not(test))]
 #[no_mangle]
 pub fn main() -> ! {
     // Initialize the global logger.
@@ -45,11 +50,13 @@ pub fn main() -> ! {
     #[cfg(debug_assertions)]
     init_log();
 
-    // Enable vblank interrupts.
-    DISPSTAT.write(DisplayStatus::new().with_irq_vblank(true));
-    IE.write(IrqBits::VBLANK);
-    // Enable interrupts generally.
-    IME.write(true);
+    unsafe {
+        // Enable vblank interrupts.
+        DISPSTAT.write_volatile(DisplayStatus::ENABLE_VBLANK_INTERRUPTS);
+        IE.write_volatile(Interrupts::VBLANK);
+        // Enable interrupts generally.
+        IME.write_volatile(true);
+    }
 
     let mut screen = Screen::default();
 
@@ -58,5 +65,9 @@ pub fn main() -> ! {
     }
 }
 
+#[cfg(test)]
 #[no_mangle]
-pub fn __sync_synchronize() {}
+pub fn main() {
+    init_log();
+    test_harness()
+}

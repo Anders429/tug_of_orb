@@ -1,24 +1,21 @@
 use super::Screen;
 use crate::{
-    game,
-    game::{Direction, Node, Position, Turn},
-};
-use core::{ops::BitOrAssign, slice};
-use gba::{
-    bios::VBlankIntrWait,
-    keys::KeyInput,
+    bios::wait_for_vblank,
+    game::{self, Direction, Node, Position, Turn},
+    include_bytes_aligned,
     mmio::{
-        bg_palbank, obj_palbank, BG0CNT, BG1CNT, BG1HOFS, BG1VOFS, BG2CNT, BG2HOFS, BG2VOFS,
-        BLDCNT, BLDY, CHARBLOCK0_4BPP, DISPCNT, KEYINPUT, OBJ_ATTR0, OBJ_ATTR_ALL, OBJ_TILES,
-        TEXT_SCREENBLOCKS,
+        keys::KeyInput,
+        vram::{
+            BackgroundControl, BlendControl, ColorEffect, DisplayControl, ObjectAttributes,
+            TextScreenEntry,
+        },
+        BG0CNT, BG1CNT, BG1HOFS, BG1VOFS, BG2CNT, BG2HOFS, BG2VOFS, BG_PALETTE, BLDCNT, BLDY,
+        CHARBLOCK0, DISPCNT, KEYINPUT, OBJ_ATTRS, OBJ_PALETTE, OBJ_TILES, TEXT_SCREENBLOCK0,
+        TEXT_SCREENBLOCK16, TEXT_SCREENBLOCK24,
     },
-    video::{
-        obj::{ObjAttr, ObjAttr0, ObjDisplayStyle},
-        BackgroundControl, BlendControl, Color, ColorEffectMode, DisplayControl, TextEntry,
-    },
-    Align4,
 };
-
+use core::{mem::transmute, ops::BitOrAssign};
+use deranged::{RangedU16, RangedU8};
 #[derive(Clone, Copy, Debug)]
 struct Edges(u8);
 
@@ -55,36 +52,32 @@ impl BitOrAssign for Edges {
 }
 
 macro_rules! load_tiles {
-    ($file_name:literal, $offset:expr) => {
-        let aligned_bytes = Align4(*include_bytes!($file_name));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        CHARBLOCK0_4BPP
-            .as_region()
-            .sub_slice($offset..len + $offset)
-            .write_from_slice(tiles);
+    ($file_name:literal, $offset:expr, $len:expr) => {
+        unsafe {
+            CHARBLOCK0
+                .add($offset)
+                .cast::<[[u32; 8]; $len]>()
+                .write_volatile(transmute(include_bytes_aligned!($file_name).0));
+        }
     };
 }
 
 /// Sets an individual screenblock.
 ///
 /// This is basically just writing a single 8x8 tile.
-fn set_block(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
-    TEXT_SCREENBLOCKS
-        .get_frame(frame)
-        .expect("invalid frame")
-        .get_row(y)
-        .expect("invalid row")
-        .get(x)
-        .expect("invalid column")
-        .write(TextEntry::new().with_tile(tile).with_palbank(palette));
+fn set_block(x: usize, y: usize, tile: RangedU16<0, 1023>, frame: usize, palette: RangedU8<0, 15>) {
+    unsafe {
+        TEXT_SCREENBLOCK0
+            .byte_add(frame * 0x800)
+            .add(y * 32 + x)
+            .write_volatile(TextScreenEntry::new().with_tile(tile).with_palette(palette));
+    }
 }
 
 /// Set the tiles for an (x, y) position to a single tile.
 ///
 /// This tile will be used four times, as an (x, y) position occupies four tile spaces.
-fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
+fn set_tile(x: usize, y: usize, tile: RangedU16<0, 1023>, frame: usize, palette: RangedU8<0, 15>) {
     set_block(x * 2, y * 2, tile, frame, palette);
     set_block(x * 2 + 1, y * 2, tile, frame, palette);
     set_block(x * 2, y * 2 + 1, tile, frame, palette);
@@ -92,11 +85,35 @@ fn set_tile(x: usize, y: usize, tile: u16, frame: usize, palette: u16) {
 }
 
 /// Set the tiles for an (x, y) position to group of four sequential tiles.
-fn set_tile_group(x: usize, y: usize, tile_start: u16, frame: usize, palette: u16) {
+fn set_tile_group(
+    x: usize,
+    y: usize,
+    tile_start: RangedU16<0, 1023>,
+    frame: usize,
+    palette: RangedU8<0, 15>,
+) {
     set_block(x * 2, y * 2, tile_start, frame, palette);
-    set_block(x * 2 + 1, y * 2, tile_start + 1, frame, palette);
-    set_block(x * 2, y * 2 + 1, tile_start + 2, frame, palette);
-    set_block(x * 2 + 1, y * 2 + 1, tile_start + 3, frame, palette);
+    set_block(
+        x * 2 + 1,
+        y * 2,
+        tile_start.saturating_add(1),
+        frame,
+        palette,
+    );
+    set_block(
+        x * 2,
+        y * 2 + 1,
+        tile_start.saturating_add(2),
+        frame,
+        palette,
+    );
+    set_block(
+        x * 2 + 1,
+        y * 2 + 1,
+        tile_start.saturating_add(3),
+        frame,
+        palette,
+    );
 }
 
 // Returns x, y, and frame.
@@ -116,7 +133,7 @@ fn get_screen_location(mut x: usize, mut y: usize, mut frame: usize) -> (usize, 
 
 fn wait_frames(num: usize) {
     for _ in 0..num {
-        VBlankIntrWait();
+        wait_for_vblank();
     }
 }
 
@@ -168,10 +185,12 @@ impl ScrollAccelerator {
         } else {
             self.position.1
         };
-        BG1HOFS.write(x);
-        BG1VOFS.write(y);
-        BG2HOFS.write(x);
-        BG2VOFS.write(y);
+        unsafe {
+            BG1HOFS.write_volatile(RangedU16::new_unchecked(x));
+            BG1VOFS.write_volatile(RangedU16::new_unchecked(y));
+            BG2HOFS.write_volatile(RangedU16::new_unchecked(x));
+            BG2VOFS.write_volatile(RangedU16::new_unchecked(y));
+        }
         self.position = (x, y);
         target == self.position
     }
@@ -217,178 +236,148 @@ pub struct Game {
 
 impl Game {
     pub fn new(cursor: Position, game: game::Game, player_color: game::Color) -> Self {
-        VBlankIntrWait();
+        wait_for_vblank();
 
-        // Initialize fade.
-        BLDCNT.write(
-            BlendControl::new()
-                .with_target1_bg0(true)
-                .with_target1_bg1(true)
-                .with_target1_bg2(true)
-                .with_target1_bg3(true)
-                .with_target1_obj(true)
-                .with_target1_backdrop(true)
-                .with_mode(ColorEffectMode::Brighten),
-        );
-        // Fade out while we set up the screen.
-        BLDY.write(16);
+        unsafe {
+            // Initialize fade.
+            BLDCNT.write_volatile(
+                BlendControl::new()
+                    .with_target1_bg0(true)
+                    .with_target1_bg1(true)
+                    .with_target1_bg2(true)
+                    .with_target1_bg3(true)
+                    .with_target1_obj(true)
+                    .with_target1_backdrop(true)
+                    .with_color_effect(ColorEffect::Brighten),
+            );
+            // Fade out while we set up the screen.
+            BLDY.write_volatile(RangedU8::new_static::<16>());
 
-        // Set up background layers.
-        BG0CNT.write(
-            BackgroundControl::new()
-                .with_screenblock(8)
-                .with_priority(3),
-        );
-        BG1CNT.write(
-            BackgroundControl::new()
-                .with_screenblock(16)
-                .with_priority(2)
-                .with_size(3),
-        );
-        BG2CNT.write(
-            BackgroundControl::new()
-                .with_screenblock(24)
-                .with_priority(1)
-                .with_size(3),
-        );
-        DISPCNT.write(
-            DisplayControl::new()
-                .with_show_bg0(true)
-                .with_show_bg1(true)
-                .with_show_bg2(true)
-                .with_show_obj(true)
-                .with_obj_vram_1d(true),
-        );
+            // Set up background layers.
+            BG0CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<8>())
+                    .with_priority(RangedU8::new_static::<3>()),
+            );
+            BG1CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<16>())
+                    .with_priority(RangedU8::new_static::<2>())
+                    .with_screen_size(RangedU8::new_static::<3>()),
+            );
+            BG2CNT.write_volatile(
+                BackgroundControl::new()
+                    .with_screenblock(RangedU8::new_static::<24>())
+                    .with_priority(RangedU8::new_static::<1>())
+                    .with_screen_size(RangedU8::new_static::<3>()),
+            );
+            DISPCNT.write_volatile(
+                DisplayControl::new()
+                    .with_bg0(true)
+                    .with_bg1(true)
+                    .with_bg2(true)
+                    .with_obj(true)
+                    .with_obj_vram_1d(true),
+            );
 
-        // Define the neutral palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/neutral.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(0).index(index).write(Color(*bytes));
-        }
-        // Define the red palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/red.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(1).index(index).write(Color(*bytes));
-        }
-        // Define the blue palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/blue.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(2).index(index).write(Color(*bytes));
-        }
-        // Define the yellow palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/yellow.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(3).index(index).write(Color(*bytes));
-        }
-        // Define the green palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/green.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            bg_palbank(4).index(index).write(Color(*bytes));
-        }
-
-        // Define cursor palette.
-        for (index, bytes) in Align4(*include_bytes!("../../res/cursor.pal"))
-            .as_u16_slice()
-            .iter()
-            .enumerate()
-        {
-            obj_palbank(0).index(index).write(Color(*bytes));
+            // Load palettes.
+            BG_PALETTE.write_volatile(transmute(include_bytes_aligned!("../../res/neutral.pal").0));
+            BG_PALETTE
+                .add(1)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/red.pal").0));
+            BG_PALETTE
+                .add(2)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/blue.pal").0));
+            BG_PALETTE
+                .add(3)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/yellow.pal").0));
+            BG_PALETTE
+                .add(4)
+                .write_volatile(transmute(include_bytes_aligned!("../../res/green.pal").0));
+            OBJ_PALETTE.write_volatile(transmute(include_bytes_aligned!("../../res/cursor.pal").0));
         }
 
         // Define the game tiles.
-        load_tiles!("../../res/empty.4bpp", 0);
-        load_tiles!("../../res/wall.4bpp", 1);
-        load_tiles!("../../res/arrow_right.4bpp", 5);
-        load_tiles!("../../res/arrow_left.4bpp", 9);
-        load_tiles!("../../res/arrow_down.4bpp", 13);
-        load_tiles!("../../res/arrow_up.4bpp", 17);
-        load_tiles!("../../res/grid0.4bpp", 21);
-        load_tiles!("../../res/grid0_left.4bpp", 22);
-        load_tiles!("../../res/grid0_up.4bpp", 23);
-        load_tiles!("../../res/grid0_left_up.4bpp", 24);
-        load_tiles!("../../res/grid1.4bpp", 25);
-        load_tiles!("../../res/grid1_right.4bpp", 26);
-        load_tiles!("../../res/grid1_up.4bpp", 27);
-        load_tiles!("../../res/grid1_right_up.4bpp", 28);
-        load_tiles!("../../res/grid2.4bpp", 29);
-        load_tiles!("../../res/grid2_left.4bpp", 30);
-        load_tiles!("../../res/grid2_down.4bpp", 31);
-        load_tiles!("../../res/grid2_left_down.4bpp", 32);
-        load_tiles!("../../res/grid3.4bpp", 33);
-        load_tiles!("../../res/grid3_right.4bpp", 34);
-        load_tiles!("../../res/grid3_down.4bpp", 35);
-        load_tiles!("../../res/grid3_right_down.4bpp", 36);
-        load_tiles!("../../res/background.4bpp", 37);
-        load_tiles!("../../res/arrow_all.4bpp", 38);
-        load_tiles!("../../res/super_arrow_left.4bpp", 42);
-        load_tiles!("../../res/super_arrow_up.4bpp", 46);
-        load_tiles!("../../res/super_arrow_right.4bpp", 50);
-        load_tiles!("../../res/super_arrow_down.4bpp", 54);
+        load_tiles!("../../res/empty.4bpp", 0, 1);
+        load_tiles!("../../res/wall.4bpp", 1, 4);
+        load_tiles!("../../res/arrow_right.4bpp", 5, 4);
+        load_tiles!("../../res/arrow_left.4bpp", 9, 4);
+        load_tiles!("../../res/arrow_down.4bpp", 13, 4);
+        load_tiles!("../../res/arrow_up.4bpp", 17, 4);
+        load_tiles!("../../res/grid0.4bpp", 21, 1);
+        load_tiles!("../../res/grid0_left.4bpp", 22, 1);
+        load_tiles!("../../res/grid0_up.4bpp", 23, 1);
+        load_tiles!("../../res/grid0_left_up.4bpp", 24, 1);
+        load_tiles!("../../res/grid1.4bpp", 25, 1);
+        load_tiles!("../../res/grid1_right.4bpp", 26, 1);
+        load_tiles!("../../res/grid1_up.4bpp", 27, 1);
+        load_tiles!("../../res/grid1_right_up.4bpp", 28, 1);
+        load_tiles!("../../res/grid2.4bpp", 29, 1);
+        load_tiles!("../../res/grid2_left.4bpp", 30, 1);
+        load_tiles!("../../res/grid2_down.4bpp", 31, 1);
+        load_tiles!("../../res/grid2_left_down.4bpp", 32, 1);
+        load_tiles!("../../res/grid3.4bpp", 33, 1);
+        load_tiles!("../../res/grid3_right.4bpp", 34, 1);
+        load_tiles!("../../res/grid3_down.4bpp", 35, 1);
+        load_tiles!("../../res/grid3_right_down.4bpp", 36, 1);
+        load_tiles!("../../res/background.4bpp", 37, 1);
+        load_tiles!("../../res/arrow_all.4bpp", 38, 4);
+        load_tiles!("../../res/super_arrow_left.4bpp", 42, 4);
+        load_tiles!("../../res/super_arrow_up.4bpp", 46, 4);
+        load_tiles!("../../res/super_arrow_right.4bpp", 50, 4);
+        load_tiles!("../../res/super_arrow_down.4bpp", 54, 4);
 
         // Define the cursor tiles.
-        let aligned_bytes = Align4(*include_bytes!("../../res/cursor.4bpp"));
-        let bytes = aligned_bytes.as_u32_slice();
-        let len = bytes.len() / 8;
-        let tiles = unsafe { slice::from_raw_parts(bytes.as_ptr() as *const [u32; 8], len) };
-        OBJ_TILES
-            .as_region()
-            .sub_slice(..len)
-            .write_from_slice(tiles);
+        unsafe {
+            OBJ_TILES
+                .cast::<[[u32; 8]; 4]>()
+                .write_volatile(transmute::<_, [[u32; 8]; 4]>(
+                    include_bytes_aligned!("../../res/cursor.4bpp").0,
+                ))
+        }
 
         // Draw background.
         for y in 0..16 {
             for x in 0..16 {
-                set_tile(x, y, 37, 8, 1);
+                set_tile(
+                    x,
+                    y,
+                    RangedU16::new_static::<37>(),
+                    8,
+                    RangedU8::new_static::<1>(),
+                );
             }
         }
 
         // Clear BGs.
-        for frame in 0..4 {
-            for y in 0..20 {
-                for x in 0..30 {
-                    TEXT_SCREENBLOCKS
-                        .get_frame(16 + frame)
-                        .unwrap()
-                        .get_row(y)
-                        .unwrap()
-                        .get(x)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0).with_palbank(1));
-                    TEXT_SCREENBLOCKS
-                        .get_frame(24 + frame)
-                        .unwrap()
-                        .get_row(y)
-                        .unwrap()
-                        .get(x)
-                        .unwrap()
-                        .write(TextEntry::new().with_tile(0).with_palbank(0));
-                }
-            }
+        unsafe {
+            TEXT_SCREENBLOCK16
+                .cast::<[TextScreenEntry; 4096]>()
+                .write_volatile(
+                    [TextScreenEntry::new()
+                        .with_tile(RangedU16::new_static::<0>())
+                        .with_palette(RangedU8::new_static::<1>()); 4096],
+                );
+            TEXT_SCREENBLOCK24
+                .cast::<[TextScreenEntry; 4096]>()
+                .write_volatile(
+                    [TextScreenEntry::new()
+                        .with_tile(RangedU16::new_static::<0>())
+                        .with_palette(RangedU8::new_static::<0>()); 4096],
+                );
         }
 
         // Hide unused objects.
-        OBJ_ATTR0.iter().skip(1).for_each(|address| {
-            address.write(ObjAttr0::new().with_style(ObjDisplayStyle::NotDisplayed))
-        });
+        unsafe {
+            OBJ_ATTRS
+                .add(1)
+                .cast::<[ObjectAttributes; 127]>()
+                .write_volatile([ObjectAttributes::new().with_disabled(true); 127])
+        }
 
         let state = Self {
             cursor,
-            prev_keys: KeyInput::new(),
+            prev_keys: KeyInput::NONE,
 
             state: game,
             player_color,
@@ -401,24 +390,31 @@ impl Game {
         state.draw();
 
         // Draw the cursor.
-        let mut obj = ObjAttr::new();
-        obj.set_x(state.cursor.x as u16 * 8 + 52);
-        obj.set_y(state.cursor.y as u16 * 4 + 42);
-        obj.set_tile_id(0);
-        obj.set_palbank(0);
-        obj.1 = obj.1.with_size(1);
-        OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+        unsafe {
+            OBJ_ATTRS.write_volatile(
+                ObjectAttributes::new()
+                    .with_x(state.cursor.x as u16 * 8 + 52)
+                    .with_y(state.cursor.y as u8 * 4 + 42)
+                    .with_tile(RangedU16::new_static::<0>())
+                    .with_palette(RangedU8::new_static::<0>())
+                    .with_size(RangedU8::new_static::<1>()),
+            );
+        }
 
         // Scroll.
-        BG1HOFS.write(state.cursor.x as u16 * 8 + 76);
-        BG1VOFS.write(state.cursor.y as u16 * 12 + 86);
-        BG2HOFS.write(state.cursor.x as u16 * 8 + 76);
-        BG2VOFS.write(state.cursor.y as u16 * 12 + 86);
+        unsafe {
+            BG1HOFS.write_volatile(RangedU16::new_unchecked(state.cursor.x as u16 * 8 + 76));
+            BG1VOFS.write_volatile(RangedU16::new_unchecked(state.cursor.y as u16 * 12 + 86));
+            BG2HOFS.write_volatile(RangedU16::new_unchecked(state.cursor.x as u16 * 8 + 76));
+            BG2VOFS.write_volatile(RangedU16::new_unchecked(state.cursor.y as u16 * 12 + 86));
+        }
 
         // Fade in.
         for fade in (0..31).rev() {
-            VBlankIntrWait();
-            BLDY.write(fade / 2);
+            wait_for_vblank();
+            unsafe {
+                BLDY.write_volatile(RangedU8::new_unchecked(fade / 2));
+            }
         }
 
         state
@@ -497,52 +493,64 @@ impl Game {
                 // Draw node.
                 let palette = match node {
                     Node::Empty => {
-                        set_tile(x, y, 0, frame, 0);
-                        0
+                        set_tile(
+                            x,
+                            y,
+                            RangedU16::new_static::<0>(),
+                            frame,
+                            RangedU8::new_static::<0>(),
+                        );
+                        RangedU8::new_static::<0>()
                     }
                     Node::Wall => {
-                        set_tile_group(x, y, 1, frame, 0);
-                        0
+                        set_tile_group(
+                            x,
+                            y,
+                            RangedU16::new_static::<1>(),
+                            frame,
+                            RangedU8::new_static::<0>(),
+                        );
+                        RangedU8::new_static::<0>()
                     }
                     Node::Arrow {
                         direction,
                         alignment,
                     } => {
                         let palette = match alignment {
-                            Some(game::Color::Red) => 1,
-                            Some(game::Color::Blue) => 2,
-                            Some(game::Color::Yellow) => 3,
-                            Some(game::Color::Green) => 4,
-                            _ => 0,
+                            Some(game::Color::Red) => RangedU8::new_static::<1>(),
+                            Some(game::Color::Blue) => RangedU8::new_static::<2>(),
+                            Some(game::Color::Yellow) => RangedU8::new_static::<3>(),
+                            Some(game::Color::Green) => RangedU8::new_static::<4>(),
+                            _ => RangedU8::new_static::<0>(),
                         };
                         match direction {
                             Direction::Left => {
-                                set_tile_group(x, y, 9, frame, palette);
+                                set_tile_group(x, y, RangedU16::new_static::<9>(), frame, palette);
                             }
                             Direction::Right => {
-                                set_tile_group(x, y, 5, frame, palette);
+                                set_tile_group(x, y, RangedU16::new_static::<5>(), frame, palette);
                             }
                             Direction::Down => {
-                                set_tile_group(x, y, 13, frame, palette);
+                                set_tile_group(x, y, RangedU16::new_static::<13>(), frame, palette);
                             }
                             Direction::Up => {
-                                set_tile_group(x, y, 17, frame, palette);
+                                set_tile_group(x, y, RangedU16::new_static::<17>(), frame, palette);
                             }
                         }
                         palette
                     }
                     Node::AllDirection { alignment } => {
                         let palette = match alignment {
-                            Some(game::Color::Red) => 1,
-                            Some(game::Color::Blue) => 2,
-                            Some(game::Color::Yellow) => 3,
-                            Some(game::Color::Green) => 4,
-                            _ => 0,
+                            Some(game::Color::Red) => RangedU8::new_static::<1>(),
+                            Some(game::Color::Blue) => RangedU8::new_static::<2>(),
+                            Some(game::Color::Yellow) => RangedU8::new_static::<3>(),
+                            Some(game::Color::Green) => RangedU8::new_static::<4>(),
+                            _ => RangedU8::new_static::<0>(),
                         };
                         if alignment.is_some() {
-                            set_tile_group(x, y, 38, frame, palette);
+                            set_tile_group(x, y, RangedU16::new_static::<38>(), frame, palette);
                         } else {
-                            set_tile_group(x, y, 1, frame, palette);
+                            set_tile_group(x, y, RangedU16::new_static::<1>(), frame, palette);
                         }
                         palette
                     }
@@ -551,29 +559,53 @@ impl Game {
                         direction,
                     } => {
                         let palette = match alignment {
-                            Some(game::Color::Red) => 1,
-                            Some(game::Color::Blue) => 2,
-                            Some(game::Color::Yellow) => 3,
-                            Some(game::Color::Green) => 4,
-                            _ => 0,
+                            Some(game::Color::Red) => RangedU8::new_static::<1>(),
+                            Some(game::Color::Blue) => RangedU8::new_static::<2>(),
+                            Some(game::Color::Yellow) => RangedU8::new_static::<3>(),
+                            Some(game::Color::Green) => RangedU8::new_static::<4>(),
+                            _ => RangedU8::new_static::<0>(),
                         };
                         if alignment.is_some() {
                             match direction {
                                 Direction::Left => {
-                                    set_tile_group(x, y, 42, frame, palette);
+                                    set_tile_group(
+                                        x,
+                                        y,
+                                        RangedU16::new_static::<42>(),
+                                        frame,
+                                        palette,
+                                    );
                                 }
                                 Direction::Right => {
-                                    set_tile_group(x, y, 50, frame, palette);
+                                    set_tile_group(
+                                        x,
+                                        y,
+                                        RangedU16::new_static::<50>(),
+                                        frame,
+                                        palette,
+                                    );
                                 }
                                 Direction::Down => {
-                                    set_tile_group(x, y, 54, frame, palette);
+                                    set_tile_group(
+                                        x,
+                                        y,
+                                        RangedU16::new_static::<54>(),
+                                        frame,
+                                        palette,
+                                    );
                                 }
                                 Direction::Up => {
-                                    set_tile_group(x, y, 46, frame, palette);
+                                    set_tile_group(
+                                        x,
+                                        y,
+                                        RangedU16::new_static::<46>(),
+                                        frame,
+                                        palette,
+                                    );
                                 }
                             }
                         } else {
-                            set_tile_group(x, y, 1, frame, palette);
+                            set_tile_group(x, y, RangedU16::new_static::<1>(), frame, palette);
                         }
                         palette
                     }
@@ -583,31 +615,127 @@ impl Game {
 
                 // Top left
                 match (edges.contains(Edges::LEFT), edges.contains(Edges::UP)) {
-                    (false, false) => set_block(2 * x, 2 * y, 21, frame - 8, palette),
-                    (true, false) => set_block(2 * x, 2 * y, 22, frame - 8, palette),
-                    (false, true) => set_block(2 * x, 2 * y, 23, frame - 8, palette),
-                    (true, true) => set_block(2 * x, 2 * y, 24, frame - 8, palette),
+                    (false, false) => set_block(
+                        2 * x,
+                        2 * y,
+                        RangedU16::new_static::<21>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, false) => set_block(
+                        2 * x,
+                        2 * y,
+                        RangedU16::new_static::<22>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (false, true) => set_block(
+                        2 * x,
+                        2 * y,
+                        RangedU16::new_static::<23>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, true) => set_block(
+                        2 * x,
+                        2 * y,
+                        RangedU16::new_static::<24>(),
+                        frame - 8,
+                        palette,
+                    ),
                 }
                 // Top right
                 match (edges.contains(Edges::RIGHT), edges.contains(Edges::UP)) {
-                    (false, false) => set_block(2 * x + 1, 2 * y, 25, frame - 8, palette),
-                    (true, false) => set_block(2 * x + 1, 2 * y, 26, frame - 8, palette),
-                    (false, true) => set_block(2 * x + 1, 2 * y, 27, frame - 8, palette),
-                    (true, true) => set_block(2 * x + 1, 2 * y, 28, frame - 8, palette),
+                    (false, false) => set_block(
+                        2 * x + 1,
+                        2 * y,
+                        RangedU16::new_static::<25>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, false) => set_block(
+                        2 * x + 1,
+                        2 * y,
+                        RangedU16::new_static::<26>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (false, true) => set_block(
+                        2 * x + 1,
+                        2 * y,
+                        RangedU16::new_static::<27>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, true) => set_block(
+                        2 * x + 1,
+                        2 * y,
+                        RangedU16::new_static::<28>(),
+                        frame - 8,
+                        palette,
+                    ),
                 }
                 // Bottom left
                 match (edges.contains(Edges::LEFT), edges.contains(Edges::DOWN)) {
-                    (false, false) => set_block(2 * x, 2 * y + 1, 29, frame - 8, palette),
-                    (true, false) => set_block(2 * x, 2 * y + 1, 30, frame - 8, palette),
-                    (false, true) => set_block(2 * x, 2 * y + 1, 31, frame - 8, palette),
-                    (true, true) => set_block(2 * x, 2 * y + 1, 32, frame - 8, palette),
+                    (false, false) => set_block(
+                        2 * x,
+                        2 * y + 1,
+                        RangedU16::new_static::<29>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, false) => set_block(
+                        2 * x,
+                        2 * y + 1,
+                        RangedU16::new_static::<30>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (false, true) => set_block(
+                        2 * x,
+                        2 * y + 1,
+                        RangedU16::new_static::<31>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, true) => set_block(
+                        2 * x,
+                        2 * y + 1,
+                        RangedU16::new_static::<32>(),
+                        frame - 8,
+                        palette,
+                    ),
                 }
                 // Bottom right
                 match (edges.contains(Edges::RIGHT), edges.contains(Edges::DOWN)) {
-                    (false, false) => set_block(2 * x + 1, 2 * y + 1, 33, frame - 8, palette),
-                    (true, false) => set_block(2 * x + 1, 2 * y + 1, 34, frame - 8, palette),
-                    (false, true) => set_block(2 * x + 1, 2 * y + 1, 35, frame - 8, palette),
-                    (true, true) => set_block(2 * x + 1, 2 * y + 1, 36, frame - 8, palette),
+                    (false, false) => set_block(
+                        2 * x + 1,
+                        2 * y + 1,
+                        RangedU16::new_static::<33>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, false) => set_block(
+                        2 * x + 1,
+                        2 * y + 1,
+                        RangedU16::new_static::<34>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (false, true) => set_block(
+                        2 * x + 1,
+                        2 * y + 1,
+                        RangedU16::new_static::<35>(),
+                        frame - 8,
+                        palette,
+                    ),
+                    (true, true) => set_block(
+                        2 * x + 1,
+                        2 * y + 1,
+                        RangedU16::new_static::<36>(),
+                        frame - 8,
+                        palette,
+                    ),
                 }
             }
         }
@@ -621,33 +749,33 @@ impl Game {
         }
         if self.state.turn_color() == self.player_color {
             // Read keys for each frame.
-            let keys = KEYINPUT.read();
+            let keys = unsafe { KEYINPUT.read_volatile() };
             let mut state_changed = false;
 
-            if keys.start() && !self.prev_keys.start() {
+            if keys.contains(KeyInput::START) && !self.prev_keys.contains(KeyInput::START) {
                 log::info!("cursor: {:?}", self.cursor);
             }
             const MAX_POSITION: Position = Position { x: 15, y: 15 };
-            if keys.right() && !self.prev_keys.right() {
+            if keys.contains(KeyInput::RIGHT) && !self.prev_keys.contains(KeyInput::RIGHT) {
                 self.cursor = self.cursor.move_saturating(Direction::Right, MAX_POSITION);
             }
-            if keys.up() && !self.prev_keys.up() {
+            if keys.contains(KeyInput::UP) && !self.prev_keys.contains(KeyInput::UP) {
                 self.cursor = self.cursor.move_saturating(Direction::Up, MAX_POSITION);
             }
-            if keys.left() && !self.prev_keys.left() {
+            if keys.contains(KeyInput::LEFT) && !self.prev_keys.contains(KeyInput::LEFT) {
                 self.cursor = self.cursor.move_saturating(Direction::Left, MAX_POSITION);
             }
-            if keys.down() && !self.prev_keys.down() {
+            if keys.contains(KeyInput::DOWN) && !self.prev_keys.contains(KeyInput::DOWN) {
                 self.cursor = self.cursor.move_saturating(Direction::Down, MAX_POSITION);
             }
-            if keys.a() && !self.prev_keys.a() {
+            if keys.contains(KeyInput::A) && !self.prev_keys.contains(KeyInput::A) {
                 let result = self.state.execute_turn(Turn {
                     rotate: self.cursor,
                 });
                 if let Ok(winner) = result {
                     state_changed = true;
                     if winner.is_some() {
-                        VBlankIntrWait();
+                        wait_for_vblank();
 
                         self.draw();
 
@@ -660,7 +788,7 @@ impl Game {
 
             self.prev_keys = keys;
 
-            VBlankIntrWait();
+            wait_for_vblank();
 
             // Scroll.
             if self.scroll_at_start_of_player_turn {
@@ -675,13 +803,16 @@ impl Game {
                 .scroll_accelerator
                 .relative_sprite_location(self.cursor)
             {
-                let mut obj = ObjAttr::new();
-                obj.set_x(obj_pixel_pos.0);
-                obj.set_y(obj_pixel_pos.1);
-                obj.set_tile_id(0);
-                obj.set_palbank(0);
-                obj.1 = obj.1.with_size(1);
-                OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+                unsafe {
+                    OBJ_ATTRS.write_volatile(
+                        ObjectAttributes::new()
+                            .with_x(obj_pixel_pos.0)
+                            .with_y(obj_pixel_pos.1 as u8)
+                            .with_tile(RangedU16::new_static::<0>())
+                            .with_palette(RangedU8::new_static::<0>())
+                            .with_size(RangedU8::new_static::<1>()),
+                    );
+                }
             }
 
             if state_changed {
@@ -745,9 +876,9 @@ impl Game {
                     rotate: Position { x, y },
                 })
                 .unwrap();
-            VBlankIntrWait();
+            wait_for_vblank();
             loop {
-                VBlankIntrWait();
+                wait_for_vblank();
                 let completed = self
                     .scroll_accelerator
                     .scroll_to_position(Position { x, y }, 2);
@@ -756,13 +887,16 @@ impl Game {
                     .scroll_accelerator
                     .relative_sprite_location(self.cursor)
                 {
-                    let mut obj = ObjAttr::new();
-                    obj.set_x(obj_pixel_pos.0);
-                    obj.set_y(obj_pixel_pos.1);
-                    obj.set_tile_id(0);
-                    obj.set_palbank(0);
-                    obj.1 = obj.1.with_size(1);
-                    OBJ_ATTR_ALL.get(0).unwrap().write(obj);
+                    unsafe {
+                        OBJ_ATTRS.write_volatile(
+                            ObjectAttributes::new()
+                                .with_x(obj_pixel_pos.0)
+                                .with_y(obj_pixel_pos.1 as u8)
+                                .with_tile(RangedU16::new_static::<0>())
+                                .with_palette(RangedU8::new_static::<0>())
+                                .with_size(RangedU8::new_static::<1>()),
+                        );
+                    }
                 }
 
                 if completed {
@@ -770,7 +904,7 @@ impl Game {
                 }
             }
 
-            VBlankIntrWait();
+            wait_for_vblank();
             self.draw();
             wait_frames(30);
             self.scroll_at_start_of_player_turn = true;
