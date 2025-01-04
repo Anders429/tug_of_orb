@@ -1,6 +1,7 @@
 use super::{Color, ColorCounts, Direction, Node, Position};
-use core::{num::NonZeroU16, slice};
-use gba::random::{Gen32, Lcg32};
+use crate::random::Pcg32Fast;
+use core::slice;
+use rand::Rng;
 
 #[derive(Debug)]
 pub struct Grid([[Node; 16]; 16]);
@@ -29,18 +30,14 @@ impl Grid {
         };
     }
 
-    fn populate_wall(&mut self, x: usize, y: usize, lcg: &mut Lcg32) {
-        let rand = lcg.next_u8();
-        lcg.jump_state(1);
-        match rand {
+    fn populate_wall(&mut self, x: usize, y: usize, pcg: &mut Pcg32Fast) {
+        match pcg.gen::<u8>() {
             0..=63 => self.0[y][x] = Node::AllDirection { alignment: None },
             64..=127 => {
                 self.0[y][x] = Node::SuperArrow {
                     alignment: None,
                     direction: {
-                        let rand = lcg.next_u8();
-                        lcg.jump_state(1);
-                        match rand {
+                        match pcg.gen::<u8>() {
                             0..=63 => Direction::Left,
                             64..=127 => Direction::Up,
                             128..=191 => Direction::Right,
@@ -54,7 +51,7 @@ impl Grid {
     }
 
     /// Generate a random grid.
-    pub fn generate(seed: u32) -> Self {
+    pub fn generate(seed: u64) -> Self {
         let mut grid = Grid([[Node::Empty; 16]; 16]);
 
         // Starting positions.
@@ -75,16 +72,14 @@ impl Grid {
             direction: Direction::Down,
         };
 
-        let mut lcg = Lcg32::new(seed);
+        let mut pcg = Pcg32Fast::new(seed);
         for y in 0..8 {
             for x in 0..8 {
                 // Already did the starting positions.
                 if x == 0 && y == 0 {
                     continue;
                 }
-                let rand = lcg.next_u8();
-                lcg.jump_state(1);
-                match rand {
+                match pcg.gen::<u8>() {
                     0..=60 => {
                         if x == 1 && y == 0 {
                             grid.populate_reflected_arrows(x, y, Direction::Up);
@@ -111,13 +106,12 @@ impl Grid {
                         } else if y == 0 {
                             grid.populate_reflected_arrows(x, y, Direction::Right)
                         } else {
-                            grid.populate_wall(x, y, &mut lcg);
-                            grid.populate_wall(15 - y, x, &mut lcg);
-                            grid.populate_wall(y, 15 - x, &mut lcg);
-                            grid.populate_wall(15 - x, 15 - y, &mut lcg);
+                            grid.populate_wall(x, y, &mut pcg);
+                            grid.populate_wall(15 - y, x, &mut pcg);
+                            grid.populate_wall(y, 15 - x, &mut pcg);
+                            grid.populate_wall(15 - x, 15 - y, &mut pcg);
                         }
                     }
-                    _ => {}
                 }
             }
         }

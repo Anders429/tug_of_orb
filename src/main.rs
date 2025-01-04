@@ -8,6 +8,7 @@ mod align;
 mod bios;
 mod game;
 mod mmio;
+mod random;
 #[cfg(not(test))]
 mod runtime;
 mod screen;

@@ -15,7 +15,7 @@ use core::mem::transmute;
 use deranged::{RangedU16, RangedU8};
 
 pub struct Title {
-    random_seed: u32,
+    random_seed: u64,
 }
 
 impl Title {
