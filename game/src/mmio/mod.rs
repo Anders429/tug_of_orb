@@ -1,11 +1,14 @@
 //! Memory-mapped I/O addresses and types.
 
+pub mod audio;
 pub mod dma;
 pub mod interrupts;
 pub mod keys;
+pub mod timer;
 pub mod vram;
 
 use deranged::{RangedU16, RangedU8};
+use dma::DmaControl;
 use interrupts::Interrupts;
 use keys::KeyInput;
 use vram::{
@@ -25,6 +28,14 @@ pub const BG2HOFS: *mut RangedU16<0, 511> = 0x0400_0018 as *mut RangedU16<0, 511
 pub const BG2VOFS: *mut RangedU16<0, 511> = 0x0400_001A as *mut RangedU16<0, 511>;
 pub const BLDCNT: *mut BlendControl = 0x0400_0050 as *mut BlendControl;
 pub const BLDY: *mut RangedU8<0, 16> = 0x0400_0054 as *mut RangedU8<0, 16>;
+pub const AUDIO_CONTROL: *mut audio::Control = 0x0400_0082 as *mut audio::Control;
+pub const AUDIO_ENABLE: *mut audio::Enable = 0x0400_0084 as *mut audio::Enable;
+pub const AUDIO_FIFO_A: *mut u32 = 0x0400_00A0 as *mut u32;
+pub const DMA1_SOURCE: *mut *const u8 = 0x0400_00BC as *mut *const u8;
+pub const DMA1_DESTINATION: *mut *mut u8 = 0x0400_00C0 as *mut *mut u8;
+pub const DMA1_CNT: *mut DmaControl = 0x0400_00C6 as *mut DmaControl;
+pub const TIMER0_COUNT: *mut u16 = 0x0400_0100 as *mut u16;
+pub const TIMER0_CONTROL: *mut timer::Control = 0x0400_0102 as *mut timer::Control;
 pub const KEYINPUT: *mut KeyInput = 0x0400_0130 as *mut KeyInput;
 pub const IE: *mut Interrupts = 0x0400_0200 as *mut Interrupts;
 pub const IME: *mut bool = 0x0400_0208 as *mut bool;

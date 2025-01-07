@@ -1,21 +1,43 @@
+#[derive(Debug)]
+pub enum AddressControl {
+    Fixed = 2,
+}
+
+#[derive(Debug)]
+pub enum Timing {
+    Special = 3,
+}
+
 #[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
-pub(crate) struct DmaControl(u16);
+pub struct DmaControl(u16);
 
 impl DmaControl {
-    pub(crate) const fn new() -> Self {
+    pub const fn new() -> Self {
         Self(0)
     }
 
-    pub(crate) const fn with_transfer_32bit(self) -> Self {
+    pub const fn with_destination_address_control(self, control: AddressControl) -> Self {
+        Self(self.0 & !(3 << 5) | ((control as u16) << 5))
+    }
+
+    pub const fn with_repeat(self) -> Self {
+        Self(self.0 | 0b0000_0010_0000_0000)
+    }
+
+    pub const fn with_transfer_32bit(self) -> Self {
         Self(self.0 | 0b0000_0100_0000_0000)
     }
 
-    pub(crate) const fn with_enabled(self) -> Self {
+    pub const fn with_timing(self, timing: Timing) -> Self {
+        Self(self.0 & !(3 << 12) | ((timing as u16) << 12))
+    }
+
+    pub const fn with_enabled(self) -> Self {
         Self(self.0 | 0b1000_0000_0000_0000)
     }
 
-    pub(crate) const fn to_u16(self) -> u16 {
+    pub const fn to_u16(self) -> u16 {
         self.0
     }
 }

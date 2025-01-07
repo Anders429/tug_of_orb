@@ -17,6 +17,8 @@ use log::error;
 use mmio::{interrupts::Interrupts, vram::DisplayStatus, DISPSTAT, IE, IME};
 use screen::Screen;
 
+static mut VBLANKS_REMAINING: u16 = 0;
+
 /// Initialize logging in an emulator, if possible.
 ///
 /// Note that we don't actually care if either of these loggers fails to initialize. We just want
@@ -50,6 +52,35 @@ pub fn main() -> ! {
     // This logging only works in mGBA. It is only enabled in debug builds.
     #[cfg(debug_assertions)]
     init_log();
+
+    // // Audio test.
+    // unsafe {
+    //     mmio::AUDIO_CONTROL.write_volatile(mmio::audio::Control::new().sound_a_right(true).sound_a_left(true).sound_a_fifo_reset(true));
+    //     mmio::AUDIO_ENABLE.write_volatile(mmio::audio::Enable::new().master_enable(true));
+    //     let audio_bytes = include_bytes_aligned!("../res/audio/camera_zoom_in.bin").0;
+    //     let (sample_rate_bytes, samples) = audio_bytes.split_first_chunk::<4>().unwrap();
+    //     let sample_rate = u32::from_le_bytes(*sample_rate_bytes);
+    //     mmio::DMA1_SOURCE.write_volatile(samples.as_ptr());
+    //     mmio::DMA1_DESTINATION.write_volatile(mmio::AUDIO_FIFO_A.cast());
+    //     mmio::DMA1_CNT.write_volatile(mmio::dma::DmaControl::new().with_destination_address_control(mmio::dma::AddressControl::Fixed).with_repeat().with_transfer_32bit().with_timing(mmio::dma::Timing::Special).with_enabled());
+
+    //     // CLOCK is MHz per second.
+    //     // 1 / CLOCK is
+    //     // VBLANK_CYCLES is cycles / vblank.
+
+    //     const VBLANK_CYCLES: u32 = 280896;
+    //     const CLOCK: u32 = 1 << 24;
+    //     const SAMPLE_RATE: u32 = 10512;
+    //     const CYCLES_PER_SAMPLE: u32 = CLOCK / SAMPLE_RATE;
+    //     const SAMPLES_PER_VBLANK: u32 = VBLANK_CYCLES / CYCLES_PER_SAMPLE;
+
+    //     let ticks_per_sample = CLOCK / sample_rate;
+
+    //     mmio::TIMER0_COUNT.write_volatile((65536 - ticks_per_sample) as u16);
+
+    // }
+    // let audio_bytes = include_bytes_aligned!("../res/audio/camera_zoom_in.bin").0;
+    // loop {}
 
     unsafe {
         // Enable vblank interrupts.
