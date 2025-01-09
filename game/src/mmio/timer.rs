@@ -1,6 +1,6 @@
 #[derive(Debug)]
 #[repr(u8)]
-pub enum Prescalar {
+pub enum Prescaler {
     Freq1 = 0,
 }
 
@@ -13,8 +13,8 @@ impl Control {
         Self(0)
     }
 
-    pub const fn with_prescalar(self, prescalar: Prescalar) -> Self {
-        Self(self.0 & !3 | (prescalar as u16))
+    pub const fn with_prescaler(self, prescaler: Prescaler) -> Self {
+        Self(self.0 & !3 | (prescaler as u16))
     }
 
     pub const fn with_enable(self, set: bool) -> Self {
