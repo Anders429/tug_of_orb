@@ -13,11 +13,11 @@ impl Control {
         Self(0)
     }
 
-    pub const fn prescalar(self, prescalar: Prescalar) -> Self {
+    pub const fn with_prescalar(self, prescalar: Prescalar) -> Self {
         Self(self.0 & !3 | (prescalar as u16))
     }
 
-    pub const fn enable(self, set: bool) -> Self {
+    pub const fn with_enable(self, set: bool) -> Self {
         Self(self.0 & !(1 << 7) | ((set as u16) << 7))
     }
 }
